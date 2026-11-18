@@ -1,0 +1,23 @@
+# Secrets - never commit
+*.jks
+*.keystore
+key.properties
+
+# Rust
+core/target/
+
+# Flutter / Dart
+app/build/
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/linux/flutter/ephemeral/
+app/android/.gradle/
+app/android/local.properties
+
+# OS
+.DS_Store
+
+# Editors
+.idea/
+.vscode/
