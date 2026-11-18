@@ -162,6 +162,26 @@ class NodeController extends ChangeNotifier {
     return null;
   }
 
+  /// How long the native node may take to open before the app gives up and
+  /// shows the retry screen instead of spinning forever.
+  static const _startTimeout = Duration(seconds: 25);
+  static const _refreshTimeout = Duration(seconds: 8);
+
+  Future<KinlyNode> _openNode({
+    required String name,
+    required String dataDir,
+    required bool enableMdns,
+  }) {
+    return startNode(
+      options: StartOptions(
+        name: name,
+        dataDir: dataDir,
+        listenPort: 0,
+        enableMdns: enableMdns,
+      ),
+    ).timeout(_startTimeout);
+  }
+
   Future<void> start({required String dataDir, required String name}) async {
     if (_disposed || node != null || starting) return;
     this.dataDir = dataDir;
@@ -170,26 +190,37 @@ class NodeController extends ChangeNotifier {
     lastError = null;
     notifyListeners();
     try {
-      final started = await startNode(
-        options: StartOptions(
+      KinlyNode started;
+      try {
+        started = await _openNode(
           name: name,
           dataDir: dataDir,
-          listenPort: 0,
           enableMdns: true,
-        ),
-      );
+        );
+      } on TimeoutException {
+        // mDNS is optional. If opening multicast sockets wedged the native
+        // side, start again without it so chat still works.
+        debugPrint('kinly: start timed out, retrying without mDNS');
+        started = await _openNode(
+          name: name,
+          dataDir: dataDir,
+          enableMdns: false,
+        );
+      }
       node = started;
       this.name = started.name();
       deviceId = started.deviceId();
       avatarBase64 = started.avatar();
+      // Show the chat list now; the first refresh must not hold the splash.
+      if (!_disposed) notifyListeners();
       await settings.rememberName(this.name);
-      await refresh();
       _poll = Timer.periodic(const Duration(milliseconds: 500), (_) {
         _drainEvents();
       });
       _refresh = Timer.periodic(const Duration(seconds: 2), (_) {
         refresh();
       });
+      await refresh();
     } catch (error) {
       startError = error.toString();
       debugPrint('kinly: start failed: $error');
@@ -321,7 +352,7 @@ class NodeController extends ChangeNotifier {
     if (current == null || _busy || _disposed) return;
     _busy = true;
     try {
-      final people = await current.people();
+      final people = await current.people().timeout(_refreshTimeout);
       _people = people;
       for (final person in people) {
         if (!_loadedHistory.contains(person.deviceId)) {
@@ -452,7 +483,8 @@ class NodeController extends ChangeNotifier {
     }
   }
 
-  Future<void> markRead(String peer) async {    final current = node;
+  Future<void> markRead(String peer) async {
+    final current = node;
     if (current == null) return;
     try {
       await current.markRead(deviceId: peer);
@@ -480,7 +512,11 @@ class NodeController extends ChangeNotifier {
     }
   }
 
-  Future<void> updateProfile({String? name, String? avatarBase64, bool removeAvatar = false}) async {
+  Future<void> updateProfile({
+    String? name,
+    String? avatarBase64,
+    bool removeAvatar = false,
+  }) async {
     final current = node;
     if (current == null) return;
     try {

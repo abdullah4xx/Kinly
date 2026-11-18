@@ -192,6 +192,17 @@ class Strings {
       ar: 'اسمح لكينلي باستقبال الرسائل أثناء عمله في الخلفية.',
     ),
     'madeBy': (en: 'Made by Abdullah', ar: 'صنعه عبدالله'),
+    'checkUpdates': (en: 'Check for updates', ar: 'التحقق من التحديثات'),
+    'checkingUpdates': (en: 'Checking GitHub...', ar: 'جارٍ التحقق من GitHub...'),
+    'upToDate': (en: 'You have the latest version', ar: 'لديك أحدث إصدار'),
+    'updateAvailable': (en: 'Update available', ar: 'يوجد تحديث'),
+    'updateAvailableBody': (
+      en: 'Kinly {version} is ready to download.',
+      ar: 'كينلي {version} جاهز للتنزيل.',
+    ),
+    'updateFailed': (en: 'Update check failed', ar: 'فشل التحقق من التحديث'),
+    'download': (en: 'Download', ar: 'تنزيل'),
+    'later': (en: 'Later', ar: 'لاحقًا'),
     'deleteConfirmTitle': (en: 'Delete this identity?', ar: 'حذف هذه الهوية؟'),
     'quitConfirmTitle': (en: 'Close Kinly?', ar: 'إغلاق كينلي؟'),
   };

@@ -8,11 +8,11 @@ import '../theme/neu.dart';
 import '../theme/tokens.dart';
 import '../util/avatar_picker.dart';
 import '../util/system.dart';
+import '../util/update.dart';
+import '../version.dart';
 import '../widgets/avatar.dart';
 import 'security.dart';
 import 'welcome.dart';
-
-const _version = '0.0.1';
 
 /// Profile, appearance, language, behaviour, security, hidden people and
 /// destructive actions. Also reachable as a tab from the bottom bar.
@@ -33,8 +33,118 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   HSVColor? _custom;
   bool _customOpen = false;
+  bool _checkingUpdate = false;
+  String? _updateStatus;
+  UpdateInfo? _update;
 
   NodeController get _controller => widget.controller;
+
+  Future<void> _checkUpdates() async {
+    if (_checkingUpdate) return;
+    final strings = StringsScope.of(context);
+    setState(() {
+      _checkingUpdate = true;
+      _updateStatus = null;
+      _update = null;
+    });
+    try {
+      final update = await checkForUpdate();
+      if (!mounted) return;
+      setState(() {
+        _update = update;
+        _updateStatus = update == null ? strings.get('upToDate') : null;
+      });
+      if (update != null) await _offerUpdate(update);
+    } on UpdateException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _updateStatus = '${strings.get('updateFailed')}: ${error.message}';
+      });
+    } finally {
+      if (mounted) setState(() => _checkingUpdate = false);
+    }
+  }
+
+  Future<void> _offerUpdate(UpdateInfo update) async {
+    final strings = StringsScope.of(context);
+    final notes = update.notes.length > 400
+        ? '${update.notes.substring(0, 400)}…'
+        : update.notes;
+    final open = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Tokens.surfaceHigh,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Tokens.radiusLarge),
+        ),
+        title: Text(
+          strings.get('updateAvailable'),
+          style: const TextStyle(
+            color: Tokens.textPrimary,
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                strings
+                    .get('updateAvailableBody')
+                    .replaceAll('{version}', update.version),
+                style: const TextStyle(
+                  color: Tokens.textSecondary,
+                  fontSize: 13,
+                  height: 1.5,
+                ),
+              ),
+              if (notes.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  notes,
+                  style: const TextStyle(
+                    color: Tokens.textMuted,
+                    fontSize: 11.5,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              strings.get('later'),
+              style: const TextStyle(color: Tokens.textSecondary),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(
+              strings.get('download'),
+              style: const TextStyle(
+                color: Tokens.textPrimary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (open != true) return;
+    try {
+      await openUrl(update.downloadUrl);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _updateStatus = '${strings.get('updateFailed')}: $error';
+      });
+    }
+  }
 
   Future<void> _changeName() async {
     final strings = StringsScope.of(context);
@@ -253,9 +363,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 controller: _controller,
                 onChangeName: _changeName,
                 onChangePhoto: _changePhoto,
-                onRemovePhoto: () => _controller.updateProfile(
-                  removeAvatar: true,
-                ),
+                onRemovePhoto: () =>
+                    _controller.updateProfile(removeAvatar: true),
               ),
               const SizedBox(height: 24),
               _SectionTitle(text: strings.get('appearance')),
@@ -276,8 +385,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   for (final preset in Tokens.accentPresets)
                     _AccentSwatch(
                       color: preset.color,
-                      selected: settings.accent.toARGB32() ==
-                          preset.color.toARGB32(),
+                      selected:
+                          settings.accent.toARGB32() == preset.color.toARGB32(),
                       onTap: () => _applyCustom(preset.color),
                     ),
                 ],
@@ -308,10 +417,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
               const SizedBox(height: 14),
-              _AppearancePreview(
-                accent: settings.accent,
-                strings: strings,
-              ),
+              _AppearancePreview(accent: settings.accent, strings: strings),
               const SizedBox(height: 26),
               _SectionTitle(text: strings.get('language')),
               const SizedBox(height: 10),
@@ -323,7 +429,10 @@ class _SettingsPageState extends State<SettingsPage> {
               _SectionTitle(text: strings.get('settings')),
               const SizedBox(height: 10),
               Neu(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 6,
+                ),
                 child: Column(
                   children: [
                     _ToggleRow(
@@ -464,7 +573,10 @@ class _SettingsPageState extends State<SettingsPage> {
               _SectionTitle(text: strings.get('about')),
               const SizedBox(height: 10),
               Neu(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -495,7 +607,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                 ),
                               ),
                               Text(
-                                '${strings.get('version')} $_version · '
+                                '${strings.get('version')} $appVersion · '
                                 '${strings.get('madeBy')}',
                                 style: const TextStyle(
                                   color: Tokens.textMuted,
@@ -516,6 +628,91 @@ class _SettingsPageState extends State<SettingsPage> {
                         height: 1.5,
                       ),
                     ),
+                    if (Platform.isAndroid) ...[
+                      const SizedBox(height: 4),
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: withOpacity(Colors.white, 0.04),
+                      ),
+                      InkWell(
+                        onTap: _checkingUpdate
+                            ? null
+                            : _update != null
+                            ? () => _offerUpdate(_update!)
+                            : _checkUpdates,
+                        borderRadius: BorderRadius.circular(
+                          Tokens.radiusMedium,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: Row(
+                            children: [
+                              if (_checkingUpdate)
+                                SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                  ),
+                                )
+                              else
+                                Icon(
+                                  _update == null
+                                      ? Icons.system_update_alt_rounded
+                                      : Icons.download_rounded,
+                                  size: 18,
+                                  color: _update == null
+                                      ? Tokens.textMuted
+                                      : Theme.of(context).colorScheme.primary,
+                                ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _checkingUpdate
+                                          ? strings.get('checkingUpdates')
+                                          : strings.get('checkUpdates'),
+                                      style: TextStyle(
+                                        color: _update == null
+                                            ? Tokens.textPrimary
+                                            : Theme.of(
+                                                context,
+                                              ).colorScheme.primary,
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    if (_updateStatus != null) ...[
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        _updateStatus!,
+                                        style: const TextStyle(
+                                          color: Tokens.textMuted,
+                                          fontSize: 10.5,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              if (_update != null)
+                                const Icon(
+                                  Icons.chevron_right_rounded,
+                                  size: 18,
+                                  color: Tokens.textMuted,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

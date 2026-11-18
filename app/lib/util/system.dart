@@ -25,3 +25,13 @@ Future<void> requestBatteryExemption() async {
     // The channel is only present on Android; ignore failures elsewhere.
   }
 }
+
+/// Opens a web page or a download link in the system browser.
+Future<void> openUrl(String url) async {
+  if (Platform.isAndroid) {
+    await _channel.invokeMethod<void>('openUrl', {'url': url});
+    return;
+  }
+  final opener = Platform.isMacOS ? 'open' : 'xdg-open';
+  await Process.run(opener, [url]);
+}

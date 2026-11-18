@@ -621,12 +621,48 @@ async fn run_node(
     manual_peers: Vec<String>,
     enable_mdns: bool,
 ) {
+    // Discovery is optional and must never delay chat: opening multicast
+    // sockets can be slow, or blocked entirely, on some Android devices. Start
+    // it on a blocking thread and pick the result up from the main loop so the
+    // command channel is served immediately.
     let mut discovery = None;
+    let (discovery_tx, mut discovery_rx) = mpsc::channel::<
+        Result<(
+            Discovery,
+            mpsc::UnboundedReceiver<discovery::DiscoveredPeer>,
+        )>,
+    >(1);
+    let mut discovery_pending = enable_mdns;
     if enable_mdns {
-        match Discovery::start(port, &discovery::random_discovery_id()) {
-            Ok(started) => {
-                match started.browse() {
-                    Ok(mut peers) => {
+        tokio::spawn(async move {
+            let result = tokio::time::timeout(
+                Duration::from_secs(10),
+                tokio::task::spawn_blocking(move || {
+                    let started = Discovery::start(port, &discovery::random_discovery_id())?;
+                    let peers = started.browse()?;
+                    Ok::<_, anyhow::Error>((started, peers))
+                }),
+            )
+            .await;
+            let payload = match result {
+                Ok(Ok(Ok(started))) => Ok(started),
+                Ok(Ok(Err(error))) => Err(error),
+                Ok(Err(error)) => Err(anyhow::anyhow!("starting mDNS failed: {error}")),
+                Err(_) => Err(anyhow::anyhow!("starting mDNS timed out")),
+            };
+            let _ = discovery_tx.send(payload).await;
+        });
+    }
+
+    let mut ticker = tokio::time::interval(Duration::from_secs(5));
+    let mut ticks: u32 = 0;
+    let mut shutdown_reply = None;
+    loop {
+        tokio::select! {
+            init = discovery_rx.recv(), if discovery_pending => {
+                discovery_pending = false;
+                match init {
+                    Some(Ok((started, mut peers))) => {
                         let tx = state.self_tx.clone();
                         tokio::spawn(async move {
                             while let Some(peer) = peers.recv().await {
@@ -636,9 +672,10 @@ async fn run_node(
                                 }
                             }
                         });
+                        discovery = Some(started);
                     }
-                    Err(error) => {
-                        warn!("mDNS browse failed: {error:#}");
+                    Some(Err(error)) => {
+                        warn!("mDNS unavailable: {error:#}");
                         emit(
                             &state.events,
                             Event::Error {
@@ -646,26 +683,9 @@ async fn run_node(
                             },
                         );
                     }
+                    None => {}
                 }
-                discovery = Some(started);
             }
-            Err(error) => {
-                warn!("mDNS advertisement failed: {error:#}");
-                emit(
-                    &state.events,
-                    Event::Error {
-                        message: format!("discovery unavailable: {error}"),
-                    },
-                );
-            }
-        }
-    }
-
-    let mut ticker = tokio::time::interval(Duration::from_secs(5));
-    let mut ticks: u32 = 0;
-    let mut shutdown_reply = None;
-    loop {
-        tokio::select! {
             command = cmd_rx.recv() => {
                 let Some(command) = command else { break };
                 match command {

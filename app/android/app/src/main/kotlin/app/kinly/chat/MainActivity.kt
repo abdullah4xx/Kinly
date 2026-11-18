@@ -41,6 +41,21 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
                 "isBatteryExempt" -> result.success(isBatteryExempt())
+                "openUrl" -> {
+                    val url = call.argument<String>("url")
+                    if (url.isNullOrBlank()) {
+                        result.error("bad_args", "url is required", null)
+                    } else {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                            result.success(null)
+                        } catch (error: Exception) {
+                            result.error("no_handler", error.message, null)
+                        }
+                    }
+                }
                 else -> result.notImplemented()
             }
         }

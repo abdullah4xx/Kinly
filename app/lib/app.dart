@@ -89,7 +89,10 @@ class _RootGateState extends State<RootGate> {
   @override
   void initState() {
     super.initState();
-    _entered = widget.knownName == null;
+    // A returning device already has a name, so the welcome screen is skipped
+    // and the node starts right away. A fresh device must see the welcome
+    // screen first; that screen starts the node when the name is entered.
+    _entered = widget.knownName != null;
     if (widget.knownName != null && widget.initError == null) {
       widget.controller.start(dataDir: widget.dataDir, name: widget.knownName!);
     }
@@ -119,15 +122,15 @@ class _RootGateState extends State<RootGate> {
           return _FatalScreen(
             title: strings.get('startError'),
             detail: controller.startError!,
-            onRetry: () {
-              controller.reset().then((_) {
-                if (widget.knownName != null) {
-                  controller.start(
-                    dataDir: widget.dataDir,
-                    name: widget.knownName!,
-                  );
-                }
-              });
+            onRetry: () async {
+              await controller.reset();
+              if (!mounted) return;
+              final known = widget.knownName;
+              if (known != null) {
+                await controller.start(dataDir: widget.dataDir, name: known);
+              } else {
+                setState(() => _entered = false);
+              }
             },
           );
         }
@@ -167,18 +170,12 @@ class _SplashScreen extends StatelessWidget {
             SizedBox(
               width: 28,
               height: 28,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.4,
-                color: accent,
-              ),
+              child: CircularProgressIndicator(strokeWidth: 2.4, color: accent),
             ),
             const SizedBox(height: 18),
             Text(
               strings.get('starting'),
-              style: const TextStyle(
-                color: Tokens.textSecondary,
-                fontSize: 13,
-              ),
+              style: const TextStyle(color: Tokens.textSecondary, fontSize: 13),
             ),
           ],
         ),
