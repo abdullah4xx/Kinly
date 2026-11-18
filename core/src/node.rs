@@ -243,8 +243,22 @@ impl NodeHandle {
             .context("node is not running")
     }
 
+    /// Dials a manual peer address (`host:port`).
+    pub async fn connect_to(&self, address: impl Into<String>) -> Result<()> {
+        self.cmd_tx
+            .send(Command::ConnectTo {
+                address: address.into(),
+            })
+            .await
+            .context("node is not running")
+    }
+
+    /// Stops the node, closes every session and releases the listening port.
     pub async fn shutdown(&self) {
-        let _ = self.cmd_tx.send(Command::Shutdown).await;
+        let (reply, response) = oneshot::channel();
+        if self.cmd_tx.send(Command::Shutdown { reply }).await.is_ok() {
+            let _ = tokio::time::timeout(Duration::from_secs(3), response).await;
+        }
     }
 }
 
@@ -298,7 +312,9 @@ enum Command {
         limit: usize,
         reply: oneshot::Sender<Result<Vec<MessageRow>>>,
     },
-    Shutdown,
+    Shutdown {
+        reply: oneshot::Sender<()>,
+    },
 }
 
 #[derive(Debug)]
@@ -366,6 +382,8 @@ struct NodeState {
     downloads_dir: PathBuf,
     dialed_at: HashMap<String, Instant>,
     dial_interval: Duration,
+    listener_stop: watch::Sender<bool>,
+    listener_task: Option<tokio::task::JoinHandle<()>>,
 }
 
 /// Starts a node. The listener is already bound when this returns.
@@ -405,6 +423,39 @@ pub async fn start(config: Config) -> Result<NodeHandle> {
         name: name.clone(),
     };
 
+    let (listener_stop, mut listener_stop_rx) = watch::channel(false);
+    let accept_context = session_context;
+    let accept_tx = session_tx.clone();
+
+    let listener_task = tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                changed = listener_stop_rx.changed() => {
+                    if changed.is_err() || *listener_stop_rx.borrow() {
+                        break;
+                    }
+                }
+                result = listener.accept() => {
+                    match result {
+                        Ok((stream, _addr)) => {
+                            let context = accept_context.clone();
+                            let tx = accept_tx.clone();
+                            tokio::spawn(async move {
+                                if let Err(error) = run_session(stream, false, context, tx).await {
+                                    debug!("inbound session ended: {error:#}");
+                                }
+                            });
+                        }
+                        Err(error) => {
+                            warn!("listener stopped: {error}");
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
     let state = NodeState {
         identity: identity.clone(),
         noise_private: Arc::new(noise_key.private.clone()),
@@ -421,29 +472,9 @@ pub async fn start(config: Config) -> Result<NodeHandle> {
         downloads_dir,
         dialed_at: HashMap::new(),
         dial_interval: config.dial_interval,
+        listener_stop: listener_stop.clone(),
+        listener_task: Some(listener_task),
     };
-
-    let accept_context = session_context.clone();
-    let accept_tx = session_tx.clone();
-    tokio::spawn(async move {
-        loop {
-            match listener.accept().await {
-                Ok((stream, _addr)) => {
-                    let context = accept_context.clone();
-                    let tx = accept_tx.clone();
-                    tokio::spawn(async move {
-                        if let Err(error) = run_session(stream, false, context, tx).await {
-                            debug!("inbound session ended: {error:#}");
-                        }
-                    });
-                }
-                Err(error) => {
-                    warn!("listener stopped: {error}");
-                    break;
-                }
-            }
-        }
-    });
 
     let peers = config.peers.clone();
     let enable_mdns = config.enable_mdns;
@@ -510,14 +541,18 @@ async fn run_node(
 
     let mut ticker = tokio::time::interval(Duration::from_secs(5));
     let mut ticks: u32 = 0;
+    let mut shutdown_reply = None;
     loop {
         tokio::select! {
             command = cmd_rx.recv() => {
                 let Some(command) = command else { break };
-                if matches!(command, Command::Shutdown) {
-                    break;
+                match command {
+                    Command::Shutdown { reply } => {
+                        shutdown_reply = Some(reply);
+                        break;
+                    }
+                    other => handle_command(&mut state, other).await,
                 }
-                handle_command(&mut state, command).await;
             }
             event = session_rx.recv() => {
                 let Some(event) = event else { break };
@@ -540,11 +575,18 @@ async fn run_node(
         }
     }
 
+    let _ = state.listener_stop.send(true);
     if let Some(discovery) = discovery {
         discovery.shutdown();
     }
     for (_, peer) in state.peers.drain() {
         let _ = peer.shutdown.send(true);
+    }
+    if let Some(task) = state.listener_task.take() {
+        let _ = task.await;
+    }
+    if let Some(reply) = shutdown_reply {
+        let _ = reply.send(());
     }
 }
 
@@ -649,7 +691,7 @@ async fn handle_command(state: &mut NodeState, command: Command) {
         Command::History { peer, limit, reply } => {
             let _ = reply.send(state.storage.messages(&peer, limit));
         }
-        Command::Shutdown => {}
+        Command::Shutdown { .. } => {}
     }
 }
 

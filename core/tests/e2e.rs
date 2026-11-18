@@ -34,12 +34,23 @@ impl Drop for TempDir {
     }
 }
 
-async fn start(name: &str, dir: &TempDir, peers: Vec<String>, dial_ms: u64) -> NodeHandle {
+async fn start_at(
+    name: &str,
+    dir: &TempDir,
+    peers: Vec<String>,
+    dial_ms: u64,
+    port: u16,
+) -> NodeHandle {
     let mut config = Config::new(name, dir.path());
     config.enable_mdns = false;
     config.peers = peers;
+    config.listen_port = port;
     config.dial_interval = Duration::from_millis(dial_ms);
     node::start(config).await.unwrap()
+}
+
+async fn start(name: &str, dir: &TempDir, peers: Vec<String>, dial_ms: u64) -> NodeHandle {
+    start_at(name, dir, peers, dial_ms, 0).await
 }
 
 async fn wait_for_person(handle: &NodeHandle, name: &str) -> Person {
@@ -390,6 +401,170 @@ async fn a_packet_capture_contains_no_plaintext() {
             bytes.len()
         );
     }
+
+    alice.shutdown().await;
+    bob.shutdown().await;
+    sleep(Duration::from_millis(200)).await;
+}
+
+/// Writes `size` bytes of a deterministic pattern and returns the BLAKE3 hash.
+fn write_pattern_file(path: &Path, size: u64) -> String {
+    use std::io::Write as _;
+    let mut file = std::fs::File::create(path).unwrap();
+    let block: Vec<u8> = (0..64 * 1024u32)
+        .map(|value| (value.wrapping_mul(17) % 253) as u8)
+        .collect();
+    let mut hasher = blake3::Hasher::new();
+    let mut written = 0u64;
+    while written < size {
+        let take = block.len().min((size - written) as usize);
+        file.write_all(&block[..take]).unwrap();
+        hasher.update(&block[..take]);
+        written += take as u64;
+    }
+    hasher.finalize().to_hex().to_string()
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_file_transfer_resumes_after_interruption() {
+    let dir_a = TempDir::new("resume-a");
+    let dir_b = TempDir::new("resume-b");
+
+    let bob = start("Bob", &dir_b, Vec::new(), 200).await;
+    let bob_port = bob.port;
+    let mut bob_events = bob.subscribe();
+    let alice = start("Alice", &dir_a, vec![format!("127.0.0.1:{bob_port}")], 200).await;
+    wait_for_person(&alice, "Bob").await;
+    wait_for_person(&bob, "Alice").await;
+
+    let source = dir_a.path().join("big.bin");
+    let payload_hash = write_pattern_file(&source, 8 * 1024 * 1024);
+    let transfer_id = alice
+        .send_file(&bob.device_id, source.clone())
+        .await
+        .unwrap();
+
+    // Interrupt once at least 1 MiB arrived.
+    timeout(Duration::from_secs(30), async {
+        loop {
+            if let Ok(Event::FileProgress {
+                transfer_id: id,
+                received,
+                ..
+            }) = bob_events.recv().await
+            {
+                if id == transfer_id && received >= 1024 * 1024 {
+                    return;
+                }
+            }
+        }
+    })
+    .await
+    .expect("transfer did not make progress");
+    bob.shutdown().await;
+
+    let part = dir_b
+        .path()
+        .join("downloads")
+        .join(format!("{transfer_id}.part"));
+    let partial = std::fs::metadata(&part)
+        .expect("partial file should stay on disk")
+        .len();
+    assert!(partial >= 1024 * 1024, "partial={partial}");
+
+    // Restart Bob on the same port; Alice keeps dialing it and must resume the
+    // transfer from the partial file instead of starting over.
+    let bob = start_at("Bob", &dir_b, Vec::new(), 200, bob_port).await;
+    let mut bob_events = bob.subscribe();
+    let offer = wait_event(&mut bob_events, |event| {
+        matches!(
+            event,
+            Event::FileOffer { transfer_id: id, .. } if *id == transfer_id
+        )
+    })
+    .await;
+    match offer {
+        Event::FileOffer { offset, size, .. } => {
+            assert_eq!(size, 8 * 1024 * 1024);
+            assert!(offset >= partial, "resume offset {offset} < {partial}");
+        }
+        _ => unreachable!(),
+    }
+    let completed = wait_event(
+        &mut bob_events,
+        |event| matches!(event, Event::FileComplete { transfer_id: id, .. } if *id == transfer_id),
+    )
+    .await;
+    let saved = match completed {
+        Event::FileComplete { path, .. } => PathBuf::from(path),
+        _ => unreachable!(),
+    };
+    assert_eq!(
+        blake3::hash(&tokio::fs::read(&saved).await.unwrap())
+            .to_hex()
+            .to_string(),
+        payload_hash
+    );
+
+    alice.shutdown().await;
+    bob.shutdown().await;
+    sleep(Duration::from_millis(200)).await;
+}
+
+/// Phase 1 acceptance: a 1 GiB file transfers without corruption.
+/// Run locally with `cargo test --test e2e one_gigabyte -- --ignored --nocapture`.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "1 GiB transfer, run locally for the Phase 1 acceptance check"]
+async fn one_gigabyte_file_transfers_without_corruption() {
+    let dir_a = TempDir::new("gig-a");
+    let dir_b = TempDir::new("gig-b");
+
+    let bob = start("Bob", &dir_b, Vec::new(), 200).await;
+    let mut bob_events = bob.subscribe();
+    let alice = start(
+        "Alice",
+        &dir_a,
+        vec![format!("127.0.0.1:{}", bob.port)],
+        200,
+    )
+    .await;
+    wait_for_person(&alice, "Bob").await;
+
+    let source = dir_a.path().join("one-gigabyte.bin");
+    let size = 1024u64 * 1024 * 1024;
+    let expected = write_pattern_file(&source, size);
+    let transfer_id = alice
+        .send_file(&bob.device_id, source.clone())
+        .await
+        .unwrap();
+    let completed = timeout(Duration::from_secs(600), async {
+        loop {
+            match bob_events.recv().await {
+                Ok(Event::FileComplete {
+                    transfer_id: id,
+                    path,
+                }) if id == transfer_id => {
+                    return path;
+                }
+                Ok(Event::FileFailed {
+                    transfer_id: id,
+                    error,
+                }) if id == transfer_id => panic!("transfer failed: {error}"),
+                Ok(_) => {}
+                Err(_) => panic!("event stream closed"),
+            }
+        }
+    })
+    .await
+    .expect("1 GiB transfer timed out");
+    let metadata = tokio::fs::metadata(&completed).await.unwrap();
+    assert_eq!(metadata.len(), size);
+    assert_eq!(
+        kinly_core::files::hash_file(Path::new(&completed))
+            .await
+            .unwrap(),
+        expected
+    );
 
     alice.shutdown().await;
     bob.shutdown().await;
