@@ -1,0 +1,31 @@
+[package]
+name = "kinly-core"
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+authors = ["Abdullah (@abdullah4xx)"]
+description = "Kinly core: protocol, crypto, discovery, storage, and file transfer"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+anyhow = "1.0.104"
+base64 = "0.23.1"
+blake3 = "1.8.7"
+clap = { version = "4.6.7", features = ["derive"] }
+dirs = "7.0.0"
+ed25519-dalek = "3.0.0"
+hex = "0.4.3"
+local-ip-address = "0.6.13"
+mdns-sd = "0.21.7"
+rand = "0.10.4"
+rusqlite = { version = "0.43.0", features = ["bundled-sqlcipher-vendored-openssl"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+snow = "0.10.0"
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["full"] }
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
+uuid = { version = "1.29.2", features = ["serde", "v4"] }
