@@ -1,0 +1,87 @@
+name: APK
+
+# Builds an installable APK on every push to main and on demand. The APK is
+# signed with the debug key unless the signing secrets exist, which is enough
+# for sideloading test builds. Tagged releases use release.yml instead.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.50.0"
+  NDK_VERSION: "28.2.13676358"
+
+jobs:
+  apk:
+    name: Build APK (arm64)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: |
+          sdkmanager --install "ndk;$NDK_VERSION" > /dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core -> target
+          key: android-arm64
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Build core for Android
+        working-directory: core
+        run: |
+          cargo ndk \
+            -t arm64-v8a \
+            --platform 24 \
+            -o ../app/android/app/src/main/jniLibs \
+            build --release
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Build APK
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter build apk --release --target-platform android-arm64
+
+      - name: Name APK
+        run: |
+          mkdir -p dist
+          cp app/build/app/outputs/flutter-apk/app-release.apk \
+            "dist/kinly-${GITHUB_SHA::7}-arm64.apk"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: kinly-apk
+          path: dist/*.apk
+          if-no-files-found: error

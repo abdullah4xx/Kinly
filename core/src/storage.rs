@@ -125,6 +125,12 @@ impl Storage {
         Ok(())
     }
 
+    pub fn remove_setting(&self, key: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM settings WHERE key = ?1", params![key])?;
+        Ok(())
+    }
+
     pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
         let conn = self.conn.lock().unwrap();
         Ok(conn
@@ -293,6 +299,40 @@ impl Storage {
         Ok(())
     }
 
+    /// Marks every received message from `peer` as read and returns their IDs.
+    pub fn mark_messages_read(&self, peer: &str) -> Result<Vec<Uuid>> {
+        let conn = self.conn.lock().unwrap();
+        let ids = {
+            let mut stmt = conn.prepare(
+                "SELECT id FROM messages
+                 WHERE peer = ?1 AND direction = 'in' AND state != 'read'",
+            )?;
+            let rows = stmt.query_map(params![peer], |row| row.get::<_, String>(0))?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        conn.execute(
+            "UPDATE messages SET state = 'read'
+             WHERE peer = ?1 AND direction = 'in' AND state != 'read'",
+            params![peer],
+        )?;
+        Ok(ids
+            .into_iter()
+            .filter_map(|id| Uuid::parse_str(&id).ok())
+            .collect())
+    }
+
+    /// Number of received messages that were not marked read yet.
+    pub fn unread_count(&self, peer: &str) -> Result<u32> {
+        let conn = self.conn.lock().unwrap();
+        let count: i64 = conn.query_row(
+            "SELECT count(*) FROM messages
+             WHERE peer = ?1 AND direction = 'in' AND state != 'read'",
+            params![peer],
+            |row| row.get(0),
+        )?;
+        Ok(count as u32)
+    }
+
     pub fn update_message_state(&self, id: Uuid, state: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
@@ -300,6 +340,20 @@ impl Storage {
             params![id.to_string(), state],
         )?;
         Ok(())
+    }
+
+    /// A single stored message by ID.
+    pub fn message(&self, id: Uuid) -> Result<Option<MessageRow>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, peer, direction, body, state, created_at
+             FROM messages WHERE id = ?1",
+        )?;
+        let mut rows = stmt.query_map(params![id.to_string()], row_to_message)?;
+        match rows.next() {
+            Some(row) => Ok(Some(row?)),
+            None => Ok(None),
+        }
     }
 
     /// Messages addressed to `peer` that have not been delivered yet.

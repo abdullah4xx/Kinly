@@ -43,8 +43,8 @@ jobs:
 
       - name: Install Android NDK
         run: |
-          sdkmanager --install "ndk;27.0.12077973" > /dev/null
-          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.0.12077973" >> "$GITHUB_ENV"
+          sdkmanager --install "ndk;28.2.13676358" > /dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/28.2.13676358" >> "$GITHUB_ENV"
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -61,7 +61,11 @@ jobs:
 
       - name: Build core for Android
         working-directory: core
-        run: cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 build --release
+        run: |
+          cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 \
+            --platform 24 \
+            -o ../app/android/app/src/main/jniLibs \
+            build --release
 
       - name: Configure signing
         env:

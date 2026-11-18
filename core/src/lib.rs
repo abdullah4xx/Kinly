@@ -3,13 +3,17 @@
 //! See `PLAN.md` for scope and phases. All networking, crypto and storage
 //! live here; the Flutter app only displays state and sends commands.
 
+pub mod api;
 pub mod crypto;
 pub mod discovery;
 pub mod files;
 pub mod identity;
 pub mod node;
 pub mod protocol;
+pub mod safety;
 pub mod storage;
+
+mod frb_generated;
 
 /// Returns the crate version.
 pub fn version() -> &'static str {

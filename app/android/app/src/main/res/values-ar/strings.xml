@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="service_channel">اتصال كينلي</string>
+    <string name="service_title">كينلي يعمل</string>
+    <string name="service_body">يستقبل رسائل العائلة على هذه الشبكة</string>
+</resources>

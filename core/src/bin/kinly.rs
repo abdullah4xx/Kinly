@@ -71,7 +71,7 @@ async fn main() -> Result<()> {
 
     let handle = node::start(config).await?;
     println!("Kinly - offline end-to-end encrypted chat");
-    println!("  name:      {}", handle.name);
+    println!("  name:      {}", handle.name());
     println!("  device:    {}", handle.device_id);
     println!("  port:      {}", handle.port);
     if args.no_mdns {
@@ -158,7 +158,7 @@ async fn handle_command(
             );
         }
         "/whoami" => {
-            println!("{} ({})", handle.name, handle.device_id);
+            println!("{} ({})", handle.name(), handle.device_id);
         }
         "/list" => {
             let people = handle.people().await?;
@@ -302,6 +302,9 @@ async fn print_event(
         Event::PeerDown { device_id } => {
             online.remove(&device_id);
             println!("[*] {} is offline", display_name(names, &device_id));
+        }
+        Event::ProfileChanged { name, .. } => {
+            println!("[*] profile updated: {name}");
         }
         Event::PeerVisibility { device_id, visible } => {
             let name = display_name(names, &device_id);

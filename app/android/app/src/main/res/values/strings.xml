@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="service_channel">Kinly connection</string>
+    <string name="service_title">Kinly is running</string>
+    <string name="service_body">Listening for family messages on this network</string>
+</resources>

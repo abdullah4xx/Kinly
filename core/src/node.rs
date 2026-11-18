@@ -23,7 +23,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{broadcast, mpsc, oneshot, watch};
+use tokio::sync::{broadcast, mpsc, oneshot, watch, RwLock};
 use tracing::{debug, warn};
 use uuid::Uuid;
 
@@ -37,6 +37,8 @@ const PROGRESS_INTERVAL: Duration = Duration::from_millis(200);
 #[derive(Debug, Clone)]
 pub struct Config {
     pub name: String,
+    /// Optional avatar as a base64 encoded PNG/JPEG.
+    pub avatar: Option<String>,
     pub data_dir: PathBuf,
     pub listen_port: u16,
     /// Manual peers as `host:port` (useful for tests and for networks where
@@ -51,6 +53,7 @@ impl Config {
     pub fn new(name: impl Into<String>, data_dir: impl Into<PathBuf>) -> Self {
         Self {
             name: name.into(),
+            avatar: None,
             data_dir: data_dir.into(),
             listen_port: 0,
             peers: Vec::new(),
@@ -69,6 +72,11 @@ pub enum Event {
     },
     PeerDown {
         device_id: String,
+    },
+    /// Our own profile changed (name or photo).
+    ProfileChanged {
+        name: String,
+        avatar: Option<String>,
     },
     /// Visibility changed: our own hide toggle, or the peer hiding from us.
     PeerVisibility {
@@ -124,11 +132,41 @@ pub enum Event {
     },
 }
 
+/// The local profile, shared between the actor and the sessions so a rename or
+/// a new photo applies to the next handshake without restarting the node.
+pub struct Profile {
+    name: RwLock<String>,
+    avatar: RwLock<Option<String>>,
+}
+
+impl Profile {
+    fn new(name: String, avatar: Option<String>) -> Self {
+        Self {
+            name: RwLock::new(name),
+            avatar: RwLock::new(avatar),
+        }
+    }
+
+    pub fn name(&self) -> String {
+        self.name
+            .try_read()
+            .map(|name| name.clone())
+            .unwrap_or_default()
+    }
+
+    pub fn avatar(&self) -> Option<String> {
+        self.avatar
+            .try_read()
+            .ok()
+            .and_then(|avatar| avatar.clone())
+    }
+}
+
 /// Handle used by the app to send commands and subscribe to events.
 pub struct NodeHandle {
     pub device_id: String,
-    pub name: String,
     pub port: u16,
+    profile: Arc<Profile>,
     cmd_tx: mpsc::Sender<Command>,
     events: broadcast::Sender<Event>,
 }
@@ -136,6 +174,33 @@ pub struct NodeHandle {
 impl NodeHandle {
     pub fn subscribe(&self) -> broadcast::Receiver<Event> {
         self.events.subscribe()
+    }
+
+    pub fn name(&self) -> String {
+        self.profile.name()
+    }
+
+    pub fn avatar(&self) -> Option<String> {
+        self.profile.avatar()
+    }
+
+    /// Renames this device and/or replaces the profile photo. The change is
+    /// announced to peers on their next handshake.
+    pub async fn set_profile(
+        &self,
+        name: Option<String>,
+        avatar: Option<Option<String>>,
+    ) -> Result<()> {
+        let (reply, response) = oneshot::channel();
+        self.cmd_tx
+            .send(Command::SetProfile {
+                name,
+                avatar,
+                reply,
+            })
+            .await
+            .context("node is not running")?;
+        response.await.context("node stopped")?
     }
 
     /// Queues a message; it is delivered immediately if the peer is online,
@@ -148,6 +213,16 @@ impl NodeHandle {
                 body: body.to_string(),
                 reply,
             })
+            .await
+            .context("node is not running")?;
+        response.await.context("node stopped")?
+    }
+
+    /// Re-queues an outgoing message and sends it again if the peer is online.
+    pub async fn retry_message(&self, message_id: Uuid) -> Result<()> {
+        let (reply, response) = oneshot::channel();
+        self.cmd_tx
+            .send(Command::RetryMessage { message_id, reply })
             .await
             .context("node is not running")?;
         response.await.context("node stopped")?
@@ -206,6 +281,29 @@ impl NodeHandle {
             })
             .await
             .context("node is not running")
+    }
+
+    /// Number of received messages from `peer` that are not read yet.
+    pub async fn unread_count(&self, peer: &str) -> Result<u32> {
+        let (reply, response) = oneshot::channel();
+        self.cmd_tx
+            .send(Command::UnreadCount {
+                peer: peer.to_string(),
+                reply,
+            })
+            .await
+            .context("node is not running")?;
+        response.await.context("node stopped")?
+    }
+
+    /// Returns the device IDs of the peers with an open session.
+    pub async fn online_peers(&self) -> Result<Vec<String>> {
+        let (reply, response) = oneshot::channel();
+        self.cmd_tx
+            .send(Command::OnlinePeers { reply })
+            .await
+            .context("node is not running")?;
+        response.await.context("node stopped")?
     }
 
     /// Lists every person the node knows about.
@@ -304,6 +402,13 @@ enum Command {
     ConnectTo {
         address: String,
     },
+    OnlinePeers {
+        reply: oneshot::Sender<Result<Vec<String>>>,
+    },
+    UnreadCount {
+        peer: String,
+        reply: oneshot::Sender<Result<u32>>,
+    },
     ListPeople {
         reply: oneshot::Sender<Result<Vec<Person>>>,
     },
@@ -311,6 +416,15 @@ enum Command {
         peer: String,
         limit: usize,
         reply: oneshot::Sender<Result<Vec<MessageRow>>>,
+    },
+    SetProfile {
+        name: Option<String>,
+        avatar: Option<Option<String>>,
+        reply: oneshot::Sender<Result<()>>,
+    },
+    RetryMessage {
+        message_id: Uuid,
+        reply: oneshot::Sender<Result<()>>,
     },
     Shutdown {
         reply: oneshot::Sender<()>,
@@ -357,7 +471,7 @@ struct SessionContext {
     noise_private: Arc<Vec<u8>>,
     storage: Arc<Storage>,
     device_id: String,
-    name: String,
+    profile: Arc<Profile>,
 }
 
 struct ConnectedPeer {
@@ -370,7 +484,7 @@ struct NodeState {
     identity: Arc<Identity>,
     noise_private: Arc<Vec<u8>>,
     storage: Arc<Storage>,
-    name: String,
+    profile: Arc<Profile>,
     device_id: String,
     events: broadcast::Sender<Event>,
     self_tx: mpsc::Sender<Command>,
@@ -401,6 +515,14 @@ pub async fn start(config: Config) -> Result<NodeHandle> {
         }
     }
     storage.set_setting("name", &name)?;
+    let avatar = match config.avatar.clone() {
+        Some(avatar) => {
+            storage.set_setting("avatar", &avatar)?;
+            Some(avatar)
+        }
+        None => storage.get_setting("avatar")?,
+    };
+    let profile = Arc::new(Profile::new(name.clone(), avatar));
 
     let downloads_dir = config.data_dir.join("downloads");
     std::fs::create_dir_all(&downloads_dir)?;
@@ -420,7 +542,7 @@ pub async fn start(config: Config) -> Result<NodeHandle> {
         noise_private: Arc::new(noise_key.private.clone()),
         storage: storage.clone(),
         device_id: device_id.clone(),
-        name: name.clone(),
+        profile: profile.clone(),
     };
 
     let (listener_stop, mut listener_stop_rx) = watch::channel(false);
@@ -460,7 +582,7 @@ pub async fn start(config: Config) -> Result<NodeHandle> {
         identity: identity.clone(),
         noise_private: Arc::new(noise_key.private.clone()),
         storage: storage.clone(),
-        name: name.clone(),
+        profile: profile.clone(),
         device_id: device_id.clone(),
         events: events.clone(),
         self_tx: cmd_tx.clone(),
@@ -484,8 +606,8 @@ pub async fn start(config: Config) -> Result<NodeHandle> {
 
     Ok(NodeHandle {
         device_id,
-        name,
         port,
+        profile,
         cmd_tx,
         events,
     })
@@ -656,13 +778,20 @@ async fn handle_command(state: &mut NodeState, command: Command) {
                 .await;
         }
         Command::MarkRead { peer } => {
-            if let Ok(messages) = state.storage.messages(&peer, 100) {
-                for message in messages.into_iter().filter(|m| m.direction == "in") {
+            if let Ok(ids) = state.storage.mark_messages_read(&peer) {
+                for message_id in ids {
+                    emit(
+                        &state.events,
+                        Event::MessageState {
+                            message_id,
+                            state: "read".into(),
+                        },
+                    );
                     let _ = send_frame(
                         state,
                         &peer,
                         Frame::Control(Payload::Ack {
-                            message_id: message.id,
+                            message_id,
                             state: AckState::Read,
                         }),
                     )
@@ -685,14 +814,61 @@ async fn handle_command(state: &mut NodeState, command: Command) {
         Command::ConnectTo { address } => {
             maybe_dial(state, &address).await;
         }
+        Command::OnlinePeers { reply } => {
+            let _ = reply.send(Ok(state.peers.keys().cloned().collect()));
+        }
+        Command::UnreadCount { peer, reply } => {
+            let _ = reply.send(state.storage.unread_count(&peer));
+        }
         Command::ListPeople { reply } => {
             let _ = reply.send(state.storage.people());
         }
         Command::History { peer, limit, reply } => {
             let _ = reply.send(state.storage.messages(&peer, limit));
         }
+        Command::SetProfile {
+            name,
+            avatar,
+            reply,
+        } => {
+            let result = set_profile(state, name, avatar).await;
+            let _ = reply.send(result);
+        }
+        Command::RetryMessage { message_id, reply } => {
+            let result = retry_message(state, message_id).await;
+            let _ = reply.send(result);
+        }
         Command::Shutdown { .. } => {}
     }
+}
+
+async fn set_profile(
+    state: &mut NodeState,
+    name: Option<String>,
+    avatar: Option<Option<String>>,
+) -> Result<()> {
+    if let Some(name) = name {
+        let name = identity::validate_name(&name)?;
+        if let Some(existing) = state.storage.person_by_name(&name)? {
+            if existing.device_id != state.device_id {
+                bail!("name already taken: {name}");
+            }
+        }
+        state.storage.set_setting("name", &name)?;
+        *state.profile.name.write().await = name;
+    }
+    if let Some(avatar) = avatar {
+        match &avatar {
+            Some(value) => state.storage.set_setting("avatar", value)?,
+            None => state.storage.remove_setting("avatar")?,
+        }
+        *state.profile.avatar.write().await = avatar;
+    }
+    let _ = state.events.send(Event::ProfileChanged {
+        name: state.profile.name(),
+        avatar: state.profile.avatar(),
+    });
+    Ok(())
 }
 
 async fn handle_session_event(state: &mut NodeState, event: SessionEvent) {
@@ -1060,6 +1236,52 @@ async fn send_message(state: &mut NodeState, peer: &str, body: &str) -> Result<U
     Ok(id)
 }
 
+/// Sends an existing outgoing message again. The message keeps its ID, so a
+/// peer that already stored it will not duplicate it.
+async fn retry_message(state: &mut NodeState, message_id: Uuid) -> Result<()> {
+    let message = state
+        .storage
+        .message(message_id)?
+        .ok_or_else(|| anyhow::anyhow!("unknown message"))?;
+    if message.direction != "out" {
+        bail!("only outgoing messages can be retried");
+    }
+    if state.storage.person(&message.peer)?.is_none() {
+        bail!("unknown peer");
+    }
+
+    state.storage.update_message_state(message_id, "queued")?;
+    emit(
+        &state.events,
+        Event::MessageState {
+            message_id,
+            state: "queued".into(),
+        },
+    );
+
+    if state.peers.contains_key(&message.peer) {
+        send_frame(
+            state,
+            &message.peer,
+            Frame::Control(Payload::Msg {
+                id: message.id,
+                body: message.body,
+                sent_at: message.created_at,
+            }),
+        )
+        .await?;
+        state.storage.update_message_state(message_id, "sent")?;
+        emit(
+            &state.events,
+            Event::MessageState {
+                message_id,
+                state: "sent".into(),
+            },
+        );
+    }
+    Ok(())
+}
+
 async fn prepare_file(state: &mut NodeState, peer: &str, path: PathBuf) -> Result<Uuid> {
     if state.storage.person(peer)?.is_none() {
         bail!("unknown peer");
@@ -1380,7 +1602,7 @@ fn session_context(state: &NodeState) -> SessionContext {
         noise_private: state.noise_private.clone(),
         storage: state.storage.clone(),
         device_id: state.device_id.clone(),
-        name: state.name.clone(),
+        profile: state.profile.clone(),
     }
 }
 
@@ -1448,7 +1670,8 @@ async fn run_session(
     }
 
     let hello = Hello {
-        name: context.name.clone(),
+        name: context.profile.name(),
+        avatar: context.profile.avatar(),
         ..probe
     };
     crypto::write_frame(
@@ -1474,7 +1697,7 @@ async fn run_session(
             let _ = events
                 .send(SessionEvent::Error {
                     device_id: Some(peer_id),
-                    message: format!("name already taken: {}", context.name),
+                    message: format!("name already taken: {}", context.profile.name()),
                 })
                 .await;
             return Ok(());
