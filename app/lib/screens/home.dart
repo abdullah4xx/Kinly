@@ -357,12 +357,12 @@ class _EmptyPeople extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Neu(
+            const Neu(
               width: 92,
               height: 92,
               radius: Tokens.radiusRound,
               inset: true,
-              child: const Icon(
+              child: Icon(
                 Icons.wifi_tethering_rounded,
                 color: Tokens.textMuted,
                 size: 34,

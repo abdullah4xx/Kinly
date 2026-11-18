@@ -330,7 +330,7 @@ class NeuToggle extends StatelessWidget {
         inset: !value,
         accent: value,
         depth: 0.5,
-        padding: EdgeInsets.all(4),
+        padding: const EdgeInsets.all(4),
         child: AnimatedAlign(
           alignment: value
               ? (Directionality.of(context) == TextDirection.rtl

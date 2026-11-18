@@ -923,7 +923,7 @@ class _AppearancePreview extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              AccentPill(label: '3'),
+              const AccentPill(label: '3'),
               const SizedBox(width: 10),
               Icon(Icons.mic_rounded, size: 18, color: accent),
               const SizedBox(width: 10),

@@ -941,12 +941,12 @@ class _EmptyChat extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Neu(
+            const Neu(
               width: 82,
               height: 82,
               radius: Tokens.radiusRound,
               inset: true,
-              child: const Icon(
+              child: Icon(
                 Icons.lock_outline_rounded,
                 color: Tokens.textMuted,
                 size: 30,
