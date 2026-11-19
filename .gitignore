@@ -18,6 +18,10 @@ app/android/local.properties
 # OS
 .DS_Store
 
+# Personal screenshots in the troubleshooting log
+Troubleshoots/screenshots/
+Troubleshoots/major/*/screenshots/
+
 # Editors
 .idea/
 .vscode/
