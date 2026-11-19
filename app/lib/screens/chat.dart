@@ -184,11 +184,10 @@ class _ChatScreenState extends State<ChatScreen> {
                       : () => showPeerSecurity(context, controller, person),
                   onCall: () => _snack(strings.get('callsSoon')),
                 ),
-                if (person != null && (!person.visible || person.hiddenByPeer))
-                  _HiddenBanner(
-                    controller: controller,
-                    person: person,
-                  ),
+                if (person != null &&
+                    !controller.isSelf(_peer) &&
+                    (!person.visible || person.hiddenByPeer))
+                  _HiddenBanner(controller: controller, person: person),
                 Expanded(
                   child: items.isEmpty
                       ? _EmptyChat(strings: strings)
@@ -206,8 +205,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                 message: item,
                                 strings: strings,
                                 reduceMotion: controller.settings.reduceMotion,
-                                onRetry: () =>
-                                    controller.retryMessage(item.id),
+                                onRetry: () => controller.retryMessage(item.id),
                               );
                             }
                             final transfer = item as TransferInfo;
@@ -269,6 +267,7 @@ class _ChatHeader extends StatelessWidget {
     final typing = controller.isTyping(deviceId);
     final name = person?.name ?? deviceId.substring(0, 8);
     final hiddenByPeer = person?.hiddenByPeer ?? false;
+    final isSelf = controller.isSelf(deviceId);
 
     final String status;
     if (typing) {
@@ -315,8 +314,21 @@ class _ChatHeader extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    name,
+                  Text.rich(
+                    TextSpan(
+                      text: name,
+                      children: [
+                        if (isSelf)
+                          TextSpan(
+                            text: ' (${strings.get('you')})',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Tokens.textMuted,
+                            ),
+                          ),
+                      ],
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -333,16 +345,14 @@ class _ChatHeader extends StatelessWidget {
                     style: TextStyle(
                       color: typing ? accent : Tokens.textSecondary,
                       fontSize: 11.5,
-                      fontStyle: typing
-                          ? FontStyle.italic
-                          : FontStyle.normal,
+                      fontStyle: typing ? FontStyle.italic : FontStyle.normal,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-          if (person != null)
+          if (person != null && !isSelf)
             NeuIconButton(
               icon: person!.visible
                   ? Icons.visibility_rounded
@@ -403,7 +413,9 @@ class _HiddenBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  theyHid ? strings.get('theyHidYou') : strings.get('youHidThem'),
+                  theyHid
+                      ? strings.get('theyHidYou')
+                      : strings.get('youHidThem'),
                   style: const TextStyle(
                     color: Tokens.textPrimary,
                     fontSize: 12.5,
@@ -528,10 +540,7 @@ class _Bubble extends StatelessWidget {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: withOpacity(
-                    Tokens.shadowDark,
-                    outgoing ? 0.35 : 0.45,
-                  ),
+                  color: withOpacity(Tokens.shadowDark, outgoing ? 0.35 : 0.45),
                   offset: const Offset(2, 3),
                   blurRadius: 8,
                 ),
@@ -625,7 +634,11 @@ class _StateMark extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 13, color: Tokens.danger),
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 13,
+              color: Tokens.danger,
+            ),
             const SizedBox(width: 3),
             Text(
               strings.get('retry'),
@@ -768,9 +781,7 @@ class _TransferBubble extends StatelessWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(Tokens.radiusRound),
                     child: LinearProgressIndicator(
-                      value: transfer.progress == 0
-                          ? null
-                          : transfer.progress,
+                      value: transfer.progress == 0 ? null : transfer.progress,
                       minHeight: 5,
                       backgroundColor: withOpacity(
                         outgoing ? Colors.black : Colors.white,
@@ -858,7 +869,8 @@ class _Composer extends StatelessWidget {
                           ? selection.start
                           : value.length;
                       text.value = TextEditingValue(
-                        text: '${value.substring(0, at)}🙂${value.substring(at)}',
+                        text:
+                            '${value.substring(0, at)}🙂${value.substring(at)}',
                         selection: TextSelection.collapsed(offset: at + 2),
                       );
                       focus.requestFocus();
@@ -884,7 +896,9 @@ class _Composer extends StatelessWidget {
                         ),
                         border: InputBorder.none,
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 13),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 13,
+                        ),
                       ),
                     ),
                   ),

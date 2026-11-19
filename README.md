@@ -110,7 +110,7 @@ and signs the Android APK and the Linux archive, then publishes both on the
 repository's Releases page.
 
 Test APKs are published as pre-releases. The current Android build is
-[1.0.1 (arm64)](https://github.com/abdullah4xx/Kinly/releases/download/apk-1.0.1/kinly-1.0.1-arm64.apk).
+[1.0.2 (arm64)](https://github.com/abdullah4xx/Kinly/releases/download/apk-1.0.2/kinly-1.0.2-arm64.apk).
 Installed builds check the GitHub Releases API from Settings and offer the
 newest APK when one exists.
 

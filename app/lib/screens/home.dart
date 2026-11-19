@@ -38,7 +38,11 @@ class _HomeShellState extends State<HomeShell> {
       bottomNavigationBar: SafeArea(
         top: false,
         minimum: const EdgeInsets.only(bottom: 14),
+        // Scaffold lays the bottom bar out with loose full-height constraints.
+        // A plain Center would expand to the whole screen and float the dock
+        // in the middle, so shrink it to the dock's height.
         child: Center(
+          heightFactor: 1,
           child: Neu(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             radius: Tokens.radiusRound,
@@ -201,10 +205,8 @@ class _ChatsPageState extends State<ChatsPage> {
                 GestureDetector(
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => SettingsPage(
-                        controller: controller,
-                        embedded: false,
-                      ),
+                      builder: (_) =>
+                          SettingsPage(controller: controller, embedded: false),
                     ),
                   ),
                   child: KinlyAvatar(
@@ -274,10 +276,7 @@ class _ChatsPageState extends State<ChatsPage> {
               child: TextField(
                 controller: _search,
                 onChanged: (value) => setState(() => _query = value),
-                style: const TextStyle(
-                  color: Tokens.textPrimary,
-                  fontSize: 14,
-                ),
+                style: const TextStyle(color: Tokens.textPrimary, fontSize: 14),
                 decoration: InputDecoration(
                   hintText: strings.get('search'),
                   hintStyle: const TextStyle(
@@ -413,7 +412,8 @@ class _PersonTile extends StatelessWidget {
     final last = controller.lastMessageFor(person.deviceId);
     final unread = controller.unreadFor(person.deviceId);
     final typing = controller.isTyping(person.deviceId);
-    final hidden = !person.visible;
+    final isSelf = controller.isSelf(person.deviceId);
+    final hidden = !person.visible && !isSelf;
 
     final preview = typing
         ? strings.get('typing')
@@ -444,8 +444,21 @@ class _PersonTile extends StatelessWidget {
                   Row(
                     children: [
                       Flexible(
-                        child: Text(
-                          person.name,
+                        child: Text.rich(
+                          TextSpan(
+                            text: person.name,
+                            children: [
+                              if (isSelf)
+                                TextSpan(
+                                  text: ' (${strings.get('you')})',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Tokens.textMuted,
+                                  ),
+                                ),
+                            ],
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -479,9 +492,7 @@ class _PersonTile extends StatelessWidget {
                           : hidden
                           ? Tokens.textMuted
                           : Tokens.textSecondary,
-                      fontStyle: typing
-                          ? FontStyle.italic
-                          : FontStyle.normal,
+                      fontStyle: typing ? FontStyle.italic : FontStyle.normal,
                     ),
                   ),
                 ],
@@ -495,9 +506,7 @@ class _PersonTile extends StatelessWidget {
                   listTime(last?.createdAt ?? 0, strings.language),
                   style: TextStyle(
                     fontSize: 10.5,
-                    fontWeight: unread > 0
-                        ? FontWeight.w700
-                        : FontWeight.w500,
+                    fontWeight: unread > 0 ? FontWeight.w700 : FontWeight.w500,
                     color: unread > 0 ? accent : Tokens.textMuted,
                   ),
                 ),
@@ -512,43 +521,42 @@ class _PersonTile extends StatelessWidget {
               ],
             ),
             const SizedBox(width: 6),
-            GestureDetector(
-              onTap: () => controller.setVisibility(
-                person.deviceId,
-                !person.visible,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(6),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Tokens.surface,
-                    boxShadow: [
-                      BoxShadow(
-                        color: withOpacity(Tokens.shadowDark, 0.6),
-                        offset: const Offset(2, 2),
-                        blurRadius: 5,
-                      ),
-                      BoxShadow(
-                        color: withOpacity(Tokens.shadowLight, 0.3),
-                        offset: const Offset(-2, -2),
-                        blurRadius: 5,
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    person.visible
-                        ? Icons.visibility_rounded
-                        : Icons.visibility_off_rounded,
-                    size: 17,
-                    color: person.visible ? accent : Tokens.textMuted,
+            if (!isSelf)
+              GestureDetector(
+                onTap: () =>
+                    controller.setVisibility(person.deviceId, !person.visible),
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Tokens.surface,
+                      boxShadow: [
+                        BoxShadow(
+                          color: withOpacity(Tokens.shadowDark, 0.6),
+                          offset: const Offset(2, 2),
+                          blurRadius: 5,
+                        ),
+                        BoxShadow(
+                          color: withOpacity(Tokens.shadowLight, 0.3),
+                          offset: const Offset(-2, -2),
+                          blurRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      person.visible
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded,
+                      size: 17,
+                      color: person.visible ? accent : Tokens.textMuted,
+                    ),
                   ),
                 ),
               ),
-            ),
           ],
         ),
       ),

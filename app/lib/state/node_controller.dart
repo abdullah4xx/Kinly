@@ -162,6 +162,10 @@ class NodeController extends ChangeNotifier {
     return null;
   }
 
+  /// True when [otherDeviceId] is this device, i.e. a chat with yourself.
+  bool isSelf(String otherDeviceId) =>
+      deviceId.isNotEmpty && otherDeviceId == deviceId;
+
   /// How long the native node may take to open before the app gives up and
   /// shows the retry screen instead of spinning forever.
   static const _startTimeout = Duration(seconds: 25);

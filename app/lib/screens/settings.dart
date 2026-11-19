@@ -325,7 +325,10 @@ class _SettingsPageState extends State<SettingsPage> {
         builder: (context, _) {
           final settings = _controller.settings;
           final people = _controller.people
-              .where((person) => !person.visible)
+              .where(
+                (person) =>
+                    !person.visible && !_controller.isSelf(person.deviceId),
+              )
               .toList();
 
           return ListView(
