@@ -30,3 +30,9 @@
    disabled.
 3. Keep the avatar/name tap as the path to the safety-code screen; that part
    already works.
+
+## 1.0.2 update
+
+Self-chats are now labelled `(You)` / `(أنت)` and no longer show the
+visibility button, in both the list and the header. The same controls for
+other people are unchanged, so this document still applies to them.

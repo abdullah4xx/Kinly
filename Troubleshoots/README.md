@@ -25,7 +25,7 @@ Screenshots live in this repository folder but are **not committed**
 
 | # | Problem | Severity | Status |
 |---|---------|----------|--------|
-| 01 | Bottom navigation dock floats in the middle of the screen and covers content | Critical | Fixed in source, verification pending |
+| 01 | Bottom navigation dock floats in the middle of the screen and covers content | Critical | Fixed in 1.0.2, device check pending |
 | 02 | The "+" button on Home is labelled "Chats" and only refreshes | Medium | Open |
 | 03 | Chat header visibility toggle is ambiguous; call button is a placeholder | Low | Open |
 | 04 | How adb and mobile-mcp were set up for device testing | Tooling | Done |
@@ -36,6 +36,7 @@ Screenshots live in this repository folder but are **not committed**
 | Version | Scope | Status |
 |---------|-------|--------|
 | [1.0.1 — startup hang and in-app updates](major/1.0.1-startup-hang-and-updates/README.md) | Splash no longer hangs; GitHub update checks | Shipped |
+| [1.0.2 — bottom dock and self-chat cleanup](major/1.0.2-dock-and-self-chat/README.md) | Dock anchored to the bottom; self-chat label; no hide button on self-chats | Released, device check pending |
 
 ## Reproducing the screenshots
 

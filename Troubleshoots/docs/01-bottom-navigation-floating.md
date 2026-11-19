@@ -2,8 +2,7 @@
 
 **Severity:** critical — it covers content on every screen that uses the dock
 (Home and Settings).
-**Status:** fixed in source (`app/lib/screens/home.dart`), not built into an
-APK yet.
+**Status:** fixed and released in **1.0.2**; on-device confirmation pending.
 **Observed on:** 1.0.1+2, OPPO A38, Android 15, 720 x 1612 px @ 320 dpi.
 
 ## Symptoms
@@ -63,6 +62,9 @@ child: Center(
 File: `app/lib/screens/home.dart`, inside `_HomeShellState.build`.
 
 ## Verification plan (after rebuilding)
+
+The 1.0.2 APK is at
+<https://github.com/abdullah4xx/Kinly/releases/download/apk-1.0.2/kinly-1.0.2-arm64.apk>.
 
 1. Install the new APK over 1.0.1.
 2. Open Home: the dock must sit at the bottom, below the empty state or the
