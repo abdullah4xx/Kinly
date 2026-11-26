@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 
 import '../src/rust/api.dart';
 import 'settings.dart';
@@ -95,6 +97,33 @@ class TransferInfo {
   }
 }
 
+/// Phase of a call with one peer.
+enum CallPhase { outgoing, ongoing, incoming, ended }
+
+/// Call state for the peer the user is talking to right now.
+class CallState {
+  CallState({
+    required this.peer,
+    required this.callId,
+    required this.isIncoming,
+    required this.video,
+  }) : phase = isIncoming ? CallPhase.incoming : CallPhase.outgoing;
+
+  final String peer;
+  final String callId;
+  final bool isIncoming;
+  final bool video;
+
+  CallPhase phase;
+  bool muted = true;
+  bool speakerOn = true;
+  String? error;
+  Map<String, dynamic>? lastSignal;
+
+  bool get isOngoing => phase == CallPhase.ongoing;
+  bool get isIncomingCall => phase == CallPhase.incoming;
+}
+
 /// Owns the Rust node and mirrors its state for the widgets.
 class NodeController extends ChangeNotifier {
   NodeController(this.settings);
@@ -121,6 +150,9 @@ class NodeController extends ChangeNotifier {
   String? lastError;
   bool nameConflict = false;
   String? conflictName;
+
+  /// The call the user is in (or just ended) with one peer.
+  CallState? call;
 
   Timer? _poll;
   Timer? _refresh;
@@ -311,11 +343,46 @@ class NodeController extends ChangeNotifier {
         case 'error':
           lastError = event.error;
         case 'call_signal':
+          _handleCallSignal(event);
           break;
       }
     }
     if (structural) refresh();
     notifyListeners();
+  }
+
+  void _handleCallSignal(BridgeEvent event) {
+    final state = call;
+    if (state == null || state.callId != event.transferId) return;
+    if (state.phase == CallPhase.ended) return;
+    Map<String, dynamic>? payload;
+    if (event.body.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(event.body);
+        if (decoded is Map<String, dynamic>) payload = decoded;
+      } catch (_) {
+        // Not JSON (or not for us); ignore malformed signals.
+      }
+    }
+    if (state.phase == CallPhase.outgoing) {
+      if (payload != null && payload['type'] == 'answer') {
+        state.phase = CallPhase.ongoing;
+        state.error = null;
+        notifyListeners();
+      } else if (payload != null && payload['type'] == 'hangup') {
+        state.phase = CallPhase.ended;
+        notifyListeners();
+      }
+      return;
+    }
+    if (state.phase == CallPhase.incoming) {
+      // An offer (or ICE) from the caller; the call screen consumes it once
+      // the user accepts.
+      if (payload != null) {
+        state.lastSignal = payload;
+        notifyListeners();
+      }
+    }
   }
 
   void _appendMessage(String peer, ChatMessage message) {
@@ -506,6 +573,81 @@ class NodeController extends ChangeNotifier {
     }
   }
 
+  /// Fresh call id for a new call leg (offer / answer share it).
+  String generateCallId() => const Uuid().v4();
+
+  /// Starts an outgoing call and forgets any previous one.
+  void startOutgoingCall({
+    required String peer,
+    required String callId,
+    required bool video,
+  }) {
+    call = CallState(
+      peer: peer,
+      callId: callId,
+      isIncoming: false,
+      video: video,
+    )..phase = CallPhase.outgoing;
+    notifyListeners();
+  }
+
+  /// Records an incoming call from [peer]; the call screen asks the user to
+  /// accept or decline.
+  void startIncomingCall({
+    required String peer,
+    required String callId,
+    required bool video,
+  }) {
+    call = CallState(
+      peer: peer,
+      callId: callId,
+      isIncoming: true,
+      video: video,
+    )..phase = CallPhase.incoming;
+    notifyListeners();
+  }
+
+  /// Moves the active call to [phase].
+  void setCallPhase(CallPhase phase) {
+    final state = call;
+    if (state == null) return;
+    state.phase = phase;
+    notifyListeners();
+  }
+
+  /// Sends a WebRTC call signal (offer / answer / candidate / hangup) through
+  /// the encrypted channel.
+  Future<void> sendCallSignal({
+    required String peer,
+    required String callId,
+    required String payload,
+  }) async {
+    final current = node;
+    if (current == null) {
+      lastError = 'kinly: node is not running';
+      notifyListeners();
+      return;
+    }
+    await current.sendCallSignal(peer: peer, callId: callId, payload: payload);
+  }
+
+  /// Ends the active call and tells the peer via a hangup signal.
+  Future<void> endCall() async {
+    final state = call;
+    if (state == null) return;
+    await sendCallSignal(
+      peer: state.peer,
+      callId: state.callId,
+      payload: jsonEncode(<String, dynamic>{'type': 'hangup'}),
+    );
+    setCallPhase(CallPhase.ended);
+  }
+
+  void clearCall() {
+    call = null;
+    notifyListeners();
+  }
+
   Future<void> setActivePeer(String? peer) async {
     activePeer = peer;
     if (peer != null) {
@@ -555,6 +697,7 @@ class NodeController extends ChangeNotifier {
     _typing.clear();
     _loadedHistory.clear();
     activePeer = null;
+    call = null;
     startError = null;
     nameConflict = false;
     conflictName = null;

@@ -48,3 +48,15 @@ String formatBytes(int bytes) {
   final digits = value >= 100 || unit == 0 ? 0 : 1;
   return '${value.toStringAsFixed(digits)} ${units[unit]}';
 }
+
+/// mm:ss (or h:mm:ss) used by the call screen timer.
+String formatCallDuration(Duration duration) {
+  final hours = duration.inHours;
+  final minutes = duration.inMinutes.remainder(60);
+  final seconds = duration.inSeconds.remainder(60);
+  final mm = minutes.toString().padLeft(2, '0');
+  final ss = seconds.toString().padLeft(2, '0');
+  return hours > 0
+      ? '${hours.toString().padLeft(2, '0')}:$mm:$ss'
+      : '$mm:$ss';
+}
