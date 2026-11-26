@@ -303,6 +303,7 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   Widget _buildVideoCall(BuildContext context) {
+    final strings = StringsScope.of(context);
     return Stack(
       fit: StackFit.expand,
       children: [
