@@ -161,6 +161,13 @@ abstract class RustLibApi extends BaseApi {
     required String deviceId,
   });
 
+  Future<void> crateApiKinlyNodeSendCallSignal({
+    required KinlyNode that,
+    required String peer,
+    required String callId,
+    required String payload,
+  });
+
   Future<String?> crateApiLoadName({required String dataDir});
 
   Future<KinlyNode> crateApiStartNode({required StartOptions options});
@@ -831,6 +838,48 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(
         debugName: 'KinlyNode_set_visibility',
         argNames: ['that', 'deviceId', 'visible'],
+      );
+
+  @override
+  Future<void> crateApiKinlyNodeSendCallSignal({
+    required KinlyNode that,
+    required String peer,
+    required String callId,
+    required String payload,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerKinlyNode(
+            that,
+            serializer,
+          );
+          sse_encode_String(peer, serializer);
+          sse_encode_String(callId, serializer);
+          sse_encode_String(payload, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 25,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiKinlyNodeSendCallSignalConstMeta,
+        argValues: [that, peer, callId, payload],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiKinlyNodeSendCallSignalConstMeta =>
+      const TaskConstMeta(
+        debugName: 'KinlyNode_send_call_signal',
+        argNames: ['that', 'peer', 'callId', 'payload'],
       );
 
   @override
@@ -1801,4 +1850,15 @@ class KinlyNodeImpl extends RustOpaque implements KinlyNode {
 
   Future<int> unreadCount({required String deviceId}) => RustLib.instance.api
       .crateApiKinlyNodeUnreadCount(that: this, deviceId: deviceId);
+
+  Future<void> sendCallSignal({
+    required String peer,
+    required String callId,
+    required String payload,
+  }) => RustLib.instance.api.crateApiKinlyNodeSendCallSignal(
+    that: this,
+    peer: peer,
+    callId: callId,
+    payload: payload,
+  );
 }

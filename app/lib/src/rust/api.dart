@@ -76,6 +76,11 @@ abstract class KinlyNode implements RustOpaqueInterface {
   Future<void> setTyping({required String deviceId, required bool typing});
 
   Future<void> setVisibility({required String deviceId, required bool visible});
+  Future<void> sendCallSignal({
+    required String peer,
+    required String callId,
+    required String payload,
+  });
 
   /// Stops the node and releases the port. Called when the app quits.
   Future<void> shutdown();

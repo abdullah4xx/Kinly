@@ -216,6 +216,16 @@ impl KinlyNode {
         runtime().block_on(self.handle.cancel_file(id))
     }
 
+    /// Sends a WebRTC call signal (offer, answer, ICE candidate or hangup)
+    /// through the encrypted channel.
+    #[frb(sync)]
+    pub fn send_call_signal(&self, peer: &str, call_id: &str, payload: &str) -> Result<()> {
+        let call_id = call_id
+            .parse::<uuid::Uuid>()
+            .map_err(|_| anyhow::anyhow!("invalid call id: {call_id}"))?;
+        runtime().block_on(self.handle.send_call_signal(peer, call_id, payload.to_string()))
+    }
+
     pub fn connect_to(&self, address: &str) -> Result<()> {
         runtime().block_on(self.handle.connect_to(address))
     }
