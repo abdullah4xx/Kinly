@@ -142,7 +142,6 @@ class Strings {
     'call': (en: 'Call', ar: 'اتصال'),
     'voiceCall': (en: 'Voice call', ar: 'مكالمة صوتية'),
     'videoCall': (en: 'Video call', ar: 'مكالمة فيديو'),
-    'callsSoon': (en: 'Calls arrive in the next update', ar: 'المكالمات في التحديث القادم'),
     'calling': (en: 'Calling...', ar: 'جارٍ الاتصال...'),
     'connecting': (en: 'Connecting...', ar: 'جارٍ التوصيل...'),
     'incomingCall': (en: 'Incoming call', ar: 'مكالمة واردة'),
