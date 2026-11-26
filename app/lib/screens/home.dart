@@ -6,6 +6,7 @@ import '../theme/neu.dart';
 import '../theme/tokens.dart';
 import '../util/format.dart';
 import '../widgets/avatar.dart';
+import 'call.dart';
 import 'chat.dart';
 import 'security.dart';
 import 'settings.dart';
@@ -21,6 +22,52 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  bool _callScreenOpen = false;
+  bool _listenerAttached = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_listenerAttached) {
+      _listenerAttached = true;
+      widget.controller.addListener(_onControllerChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    if (_listenerAttached) {
+      widget.controller.removeListener(_onControllerChanged);
+      _listenerAttached = false;
+    }
+    super.dispose();
+  }
+
+  void _onControllerChanged() {
+    final call = widget.controller.call;
+    if (call == null) return;
+    if (call.phase != CallPhase.incoming) return;
+    if (_callScreenOpen) return;
+    _callScreenOpen = true;
+    final controller = widget.controller;
+    final callId = call.callId;
+    final peer = call.peer;
+    final video = call.video;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_callScreenOpen) return;
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => CallScreen(
+            controller: controller,
+            peer: peer,
+            callId: callId,
+            isIncoming: true,
+            video: video,
+          ),
+        ),
+      ).whenComplete(() => _callScreenOpen = false);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

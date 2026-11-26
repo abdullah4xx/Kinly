@@ -117,6 +117,7 @@ class NeuIconButton extends StatefulWidget {
     super.key,
     required this.icon,
     this.onPressed,
+    this.onLongPress,
     this.size = 52,
     this.iconSize = 22,
     this.accent = false,
@@ -127,6 +128,7 @@ class NeuIconButton extends StatefulWidget {
 
   final IconData icon;
   final VoidCallback? onPressed;
+  final VoidCallback? onLongPress;
   final double size;
   final double iconSize;
   final bool accent;
@@ -160,6 +162,7 @@ class _NeuIconButtonState extends State<NeuIconButton> {
               widget.onPressed?.call();
             }
           : null,
+      onLongPress: enabled ? widget.onLongPress : null,
       child: AnimatedScale(
         scale: _down ? 0.94 : 1,
         duration: const Duration(milliseconds: 90),

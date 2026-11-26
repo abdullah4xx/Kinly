@@ -11,6 +11,7 @@ import '../theme/neu.dart';
 import '../theme/tokens.dart';
 import '../util/format.dart';
 import '../widgets/avatar.dart';
+import 'call.dart';
 import 'security.dart';
 
 const _imageTypes = XTypeGroup(
@@ -106,6 +107,25 @@ class _ChatScreenState extends State<ChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
+  Future<void> _startCall({required bool video}) async {
+    final controller = widget.controller;
+    final call = controller.call;
+    if (call?.phase == CallPhase.ongoing) return;
+    final callId = controller.generateCallId();
+    controller.startOutgoingCall(peer: _peer, callId: callId, video: video);
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CallScreen(
+          controller: controller,
+          peer: _peer,
+          callId: callId,
+          isIncoming: false,
+          video: video,
+        ),
+      ),
+    );
+  }
+
   Future<void> _pickFile({bool imagesOnly = false}) async {
     final strings = StringsScope.of(context);
     try {
@@ -182,7 +202,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   onVerify: person == null
                       ? null
                       : () => showPeerSecurity(context, controller, person),
-                  onCall: () => _snack(strings.get('callsSoon')),
+                  onCall: () => _startCall(video: false),
+                  onLongPress: () => _startCall(video: true),
                 ),
                 if (person != null &&
                     !controller.isSelf(_peer) &&
@@ -252,6 +273,7 @@ class _ChatHeader extends StatelessWidget {
     required this.deviceId,
     required this.onVerify,
     required this.onCall,
+    this.onLongPress,
   });
 
   final NodeController controller;
@@ -259,6 +281,7 @@ class _ChatHeader extends StatelessWidget {
   final String deviceId;
   final VoidCallback? onVerify;
   final VoidCallback onCall;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -373,6 +396,8 @@ class _ChatHeader extends StatelessWidget {
             iconSize: 20,
             tooltip: strings.get('call'),
             onPressed: onCall,
+            // Long press starts a video call (PLAN.md phase 3, Android only).
+            onLongPress: onLongPress,
           ),
         ],
       ),
