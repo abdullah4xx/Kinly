@@ -223,7 +223,10 @@ impl KinlyNode {
         let call_id = call_id
             .parse::<uuid::Uuid>()
             .map_err(|_| anyhow::anyhow!("invalid call id: {call_id}"))?;
-        runtime().block_on(self.handle.send_call_signal(peer, call_id, payload.to_string()))
+        runtime().block_on(
+            self.handle
+                .send_call_signal(peer, call_id, payload.to_string()),
+        )
     }
 
     pub fn connect_to(&self, address: &str) -> Result<()> {

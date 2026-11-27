@@ -1259,7 +1259,13 @@ async fn send_message(state: &mut NodeState, peer: &str, body: &str) -> Result<U
             created_at: identity::unix_now(),
         };
         state.storage.insert_message(&message)?;
-        emit(&state.events, Event::Message { device_id: peer.to_string(), message });
+        emit(
+            &state.events,
+            Event::Message {
+                device_id: peer.to_string(),
+                message,
+            },
+        );
         return Ok(id);
     }
     let person = state
