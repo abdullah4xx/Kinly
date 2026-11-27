@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import '../l10n/strings.dart';
 import '../state/node_controller.dart';
@@ -31,8 +30,9 @@ class _CameraPageState extends State<CameraPage> {
   NodeController get _controller => widget.controller;
 
   Future<bool> _ensureCamera() async {
-    final status = await Permission.camera.request();
-    return status.isGranted || status.isLimited;
+    // The camera plugins request the runtime camera permission themselves;
+    // we never block on a separate permission package.
+    return true;
   }
 
   Future<void> _takePhoto(BuildContext context) async {
