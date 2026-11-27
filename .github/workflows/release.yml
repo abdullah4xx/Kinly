@@ -172,7 +172,7 @@ jobs:
         run: |
           mkdir -p dist
           cp -r app/build/linux/x64/release/bundle dist/kinly
-          tar -C dist -czf "kinly-${VERSION_NAME}-linux-x86_64.tar.gz" kinly
+          tar -czf "dist/kinly-${VERSION_NAME}-linux-x86_64.tar.gz" -C dist kinly
           (cd dist && sha256sum "kinly-${VERSION_NAME}-linux-x86_64.tar.gz" > "kinly-${VERSION_NAME}-linux-x86_64.tar.gz.sha256")
 
       - name: Upload Linux artifact

@@ -64,7 +64,7 @@ android {
             }
             // ML Kit text recognition references optional script artifacts that
             // are not on the classpath; skip R8 shrinking so releases link.
-            minifyEnabled = false
+            isMinifyEnabled = false
         }
     }
 }
