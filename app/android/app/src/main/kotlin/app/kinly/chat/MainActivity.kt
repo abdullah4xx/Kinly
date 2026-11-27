@@ -10,7 +10,7 @@ import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
 import androidx.core.content.FileProvider
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
@@ -20,7 +20,9 @@ import java.io.File
  * service that keeps messages arriving in the background, and exposes the
  * battery-optimization prompt to Dart.
  */
-class MainActivity : FlutterActivity() {
+// FlutterFragmentActivity is used instead of FlutterActivity so AndroidX
+// BiometricPrompt has a FragmentActivity host for the app lock.
+class MainActivity : FlutterFragmentActivity() {
     private var multicastLock: WifiManager.MulticastLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
 
