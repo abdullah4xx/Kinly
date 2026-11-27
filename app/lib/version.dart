@@ -1,7 +1,7 @@
 /// The app version shown in the UI and compared with GitHub releases.
 ///
 /// Keep this in sync with `version:` in `pubspec.yaml`; a test checks it.
-const String appVersion = '1.0.2';
+const String appVersion = '1.1.3';
 
 /// Owner repository that publishes the Android builds.
 const String githubRepo = 'abdullah4xx/Kinly';

@@ -1,35 +1,52 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../theme/tokens.dart';
 
-/// Local-only preferences: accent, language, motion and notifications.
+/// Local-only preferences: accent, language, motion, wallpaper, background
+/// receiving and the app lock.
 class AppSettings extends ChangeNotifier {
   AppSettings._(
     this._prefs,
     this._accent,
     this._language,
     this._reduceMotion,
-    this._notifications,
+    this._backgroundReceive,
+    this._appLock,
+    this._wallpaper,
+    this._chatWallpapers,
   );
 
   static const _accentKey = 'accent_color';
   static const _languageKey = 'language';
   static const _motionKey = 'reduce_motion';
-  static const _notificationsKey = 'notifications';
+  static const _backgroundKey = 'background_receive';
+  static const _appLockKey = 'app_lock';
+  static const _wallpaperKey = 'chat_wallpaper';
+  static const _chatWallpapersKey = 'chat_wallpapers';
   static const _nameKey = 'last_name';
 
   final SharedPreferences _prefs;
   Color _accent;
   String _language;
   bool _reduceMotion;
-  bool _notifications;
+  bool _backgroundReceive;
+  bool _appLock;
+  String _wallpaper;
+  final Map<String, String> _chatWallpapers;
 
   Color get accent => _accent;
   String get language => _language;
   bool get reduceMotion => _reduceMotion;
-  bool get notifications => _notifications;
+  bool get backgroundReceive => _backgroundReceive;
+  bool get appLock => _appLock;
+  String get wallpaper => _wallpaper;
   bool get isArabic => _language == 'ar';
+
+  /// Kept for older callers; the toggle now controls background receiving.
+  bool get notifications => _backgroundReceive;
 
   /// Last name used on this device, so a returning user can start the node
   /// without typing it again. The node database remains the source of truth.
@@ -40,12 +57,29 @@ class AppSettings extends ChangeNotifier {
     final stored = prefs.getInt(_accentKey);
     final accent = stored == null ? Tokens.defaultAccent : Color(stored);
     final safeAccent = accentTooClose(accent) ? Tokens.defaultAccent : accent;
+    Map<String, String> chatWallpapers = const {};
+    final raw = prefs.getString(_chatWallpapersKey);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map<String, dynamic>) {
+          chatWallpapers = decoded.map(
+            (key, value) => MapEntry(key, '$value'),
+          );
+        }
+      } catch (_) {
+        // A corrupt preferences entry must not stop the app from starting.
+      }
+    }
     return AppSettings._(
       prefs,
       safeAccent,
       prefs.getString(_languageKey) ?? 'en',
       prefs.getBool(_motionKey) ?? false,
-      prefs.getBool(_notificationsKey) ?? true,
+      prefs.getBool(_backgroundKey) ?? prefs.getBool('notifications') ?? true,
+      prefs.getBool(_appLockKey) ?? false,
+      prefs.getString(_wallpaperKey) ?? 'none',
+      chatWallpapers,
     );
   }
 
@@ -73,9 +107,38 @@ class AppSettings extends ChangeNotifier {
     await _prefs.setString(_nameKey, name);
   }
 
-  Future<void> setNotifications(bool value) async {
-    _notifications = value;
-    await _prefs.setBool(_notificationsKey, value);
+  Future<void> setBackgroundReceive(bool value) async {
+    _backgroundReceive = value;
+    await _prefs.setBool(_backgroundKey, value);
+    notifyListeners();
+  }
+
+  /// Kept for older callers; forwards to [setBackgroundReceive].
+  Future<void> setNotifications(bool value) => setBackgroundReceive(value);
+
+  Future<void> setAppLock(bool value) async {
+    _appLock = value;
+    await _prefs.setBool(_appLockKey, value);
+    notifyListeners();
+  }
+
+  Future<void> setWallpaper(String id) async {
+    _wallpaper = id;
+    await _prefs.setString(_wallpaperKey, id);
+    notifyListeners();
+  }
+
+  /// The wallpaper for [peer], falling back to the global default.
+  String wallpaperFor(String peer) => _chatWallpapers[peer] ?? _wallpaper;
+
+  /// Overrides the wallpaper for one chat; pass null to follow the default.
+  Future<void> setChatWallpaper(String peer, String? id) async {
+    if (id == null) {
+      _chatWallpapers.remove(peer);
+    } else {
+      _chatWallpapers[peer] = id;
+    }
+    await _prefs.setString(_chatWallpapersKey, jsonEncode(_chatWallpapers));
     notifyListeners();
   }
 

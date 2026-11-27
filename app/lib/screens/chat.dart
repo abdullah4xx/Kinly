@@ -11,6 +11,7 @@ import '../theme/neu.dart';
 import '../theme/tokens.dart';
 import '../util/format.dart';
 import '../widgets/avatar.dart';
+import '../widgets/wallpaper.dart';
 import 'call.dart';
 import 'security.dart';
 
@@ -111,6 +112,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final controller = widget.controller;
     final call = controller.call;
     if (call?.phase == CallPhase.ongoing) return;
+    if (controller.isSelf(_peer)) return;
     final callId = controller.generateCallId();
     controller.startOutgoingCall(peer: _peer, callId: callId, video: video);
     await Navigator.of(context).push(
@@ -162,7 +164,9 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: AnimatedBuilder(
+        child: ChatWallpaper(
+          id: controller.settings.wallpaperFor(_peer),
+          child: AnimatedBuilder(
           animation: controller,
           builder: (context, _) {
             final person = controller.person(_peer);
@@ -199,7 +203,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   controller: controller,
                   person: person,
                   deviceId: _peer,
-                  onVerify: person == null
+                  onVerify: controller.isSelf(_peer)
+                      ? null
+                      : person == null
                       ? null
                       : () => showPeerSecurity(context, controller, person),
                   onCall: () => _startCall(video: false),
@@ -261,6 +267,7 @@ class _ChatScreenState extends State<ChatScreen> {
             );
           },
         ),
+        ),
       ),
     );
   }
@@ -293,7 +300,9 @@ class _ChatHeader extends StatelessWidget {
     final isSelf = controller.isSelf(deviceId);
 
     final String status;
-    if (typing) {
+    if (isSelf) {
+      status = strings.get('onlyOnThisDevice');
+    } else if (typing) {
       status = strings.get('typing');
     } else if (hiddenByPeer) {
       status = strings.get('theyHidYou');
@@ -389,16 +398,19 @@ class _ChatHeader extends StatelessWidget {
                   controller.setVisibility(deviceId, !person!.visible),
             ),
           const SizedBox(width: 8),
-          NeuIconButton(
-            icon: Icons.call_rounded,
-            accent: true,
-            size: 44,
-            iconSize: 20,
-            tooltip: strings.get('call'),
-            onPressed: onCall,
-            // Long press starts a video call (PLAN.md phase 3, Android only).
-            onLongPress: onLongPress,
-          ),
+          if (!isSelf) ...[
+            // Self chats have no peer to call.
+            NeuIconButton(
+              icon: Icons.call_rounded,
+              accent: true,
+              size: 44,
+              iconSize: 20,
+              tooltip: strings.get('call'),
+              onPressed: onCall,
+              // Long press starts a video call (PLAN.md phase 3, Android only).
+              onLongPress: onLongPress,
+            ),
+          ],
         ],
       ),
     );

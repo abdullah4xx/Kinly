@@ -7,9 +7,10 @@ import '../theme/tokens.dart';
 import '../util/format.dart';
 import '../widgets/avatar.dart';
 import 'call.dart';
+import 'camera.dart';
 import 'chat.dart';
-import 'security.dart';
 import 'settings.dart';
+import 'settings/account_page.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, required this.controller});
@@ -78,8 +79,9 @@ class _HomeShellState extends State<HomeShell> {
         index: _index,
         children: [
           ChatsPage(controller: widget.controller),
-          SecurityScreen(controller: widget.controller, embedded: true),
+          AccountPage(controller: widget.controller, embedded: true),
           SettingsPage(controller: widget.controller),
+          CameraPage(controller: widget.controller),
         ],
       ),
       bottomNavigationBar: SafeArea(
@@ -100,13 +102,15 @@ class _HomeShellState extends State<HomeShell> {
                   icon: Icons.chat_bubble_rounded,
                   label: strings.get('chats'),
                   active: _index == 0,
+                  reduceMotion: widget.controller.settings.reduceMotion,
                   onTap: () => setState(() => _index = 0),
                 ),
                 const SizedBox(width: 8),
                 _DockButton(
-                  icon: Icons.qr_code_rounded,
-                  label: strings.get('scan'),
+                  icon: Icons.person_rounded,
+                  label: strings.get('account'),
                   active: _index == 1,
+                  reduceMotion: widget.controller.settings.reduceMotion,
                   onTap: () => setState(() => _index = 1),
                 ),
                 const SizedBox(width: 8),
@@ -114,7 +118,16 @@ class _HomeShellState extends State<HomeShell> {
                   icon: Icons.settings_rounded,
                   label: strings.get('settings'),
                   active: _index == 2,
+                  reduceMotion: widget.controller.settings.reduceMotion,
                   onTap: () => setState(() => _index = 2),
+                ),
+                const SizedBox(width: 8),
+                _DockButton(
+                  icon: Icons.photo_camera_rounded,
+                  label: strings.get('camera'),
+                  active: _index == 3,
+                  reduceMotion: widget.controller.settings.reduceMotion,
+                  onTap: () => setState(() => _index = 3),
                 ),
               ],
             ),
@@ -131,46 +144,69 @@ class _DockButton extends StatelessWidget {
     required this.label,
     required this.active,
     required this.onTap,
+    required this.reduceMotion,
   });
 
   final IconData icon;
   final String label;
   final bool active;
   final VoidCallback onTap;
+  final bool reduceMotion;
 
   @override
   Widget build(BuildContext context) {
     final accent = Theme.of(context).colorScheme.primary;
+    final duration = reduceMotion
+        ? Duration.zero
+        : const Duration(milliseconds: 220);
     return Semantics(
       button: true,
       selected: active,
       label: label,
       child: GestureDetector(
         onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          padding: EdgeInsets.symmetric(
-            horizontal: active ? 18 : 14,
-            vertical: 12,
-          ),
-          decoration: BoxDecoration(
-            color: active ? accent : Colors.transparent,
-            borderRadius: BorderRadius.circular(Tokens.radiusRound),
-            boxShadow: active
-                ? [
-                    BoxShadow(
-                      color: accent.withValues(alpha: 0.32),
-                      blurRadius: 16,
-                      spreadRadius: 1,
+        behavior: HitTestBehavior.opaque,
+        child: SizedBox(
+          width: 50,
+          height: 50,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              AnimatedScale(
+                scale: active ? 1 : 0.55,
+                duration: duration,
+                curve: Curves.easeOutCubic,
+                child: AnimatedOpacity(
+                  opacity: active ? 1 : 0,
+                  duration: duration,
+                  child: Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: withOpacity(accent, 0.32),
+                          blurRadius: 16,
+                          spreadRadius: 1,
+                        ),
+                      ],
                     ),
-                  ]
-                : null,
-          ),
-          child: Icon(
-            icon,
-            size: 21,
-            color: active ? readableOn(accent) : Tokens.textMuted,
+                  ),
+                ),
+              ),
+              AnimatedScale(
+                scale: active ? 1.08 : 1,
+                duration: duration,
+                curve: Curves.easeOutCubic,
+                child: Icon(
+                  icon,
+                  size: 21,
+                  color: active ? readableOn(accent) : Tokens.textMuted,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -224,6 +260,9 @@ class _ChatsPageState extends State<ChatsPage> {
         })
         .toList();
     people.sort((a, b) {
+      final selfA = widget.controller.isSelf(a.deviceId);
+      final selfB = widget.controller.isSelf(b.deviceId);
+      if (selfA != selfB) return selfA ? -1 : 1;
       final recent = widget.controller
           .lastActivityFor(b.deviceId)
           .compareTo(widget.controller.lastActivityFor(a.deviceId));
@@ -252,8 +291,7 @@ class _ChatsPageState extends State<ChatsPage> {
                 GestureDetector(
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) =>
-                          SettingsPage(controller: controller, embedded: false),
+                      builder: (_) => AccountPage(controller: controller, embedded: false),
                     ),
                   ),
                   child: KinlyAvatar(
@@ -465,7 +503,9 @@ class _PersonTile extends StatelessWidget {
     final preview = typing
         ? strings.get('typing')
         : last?.body ??
-              (person.online
+              (isSelf
+                  ? strings.get('onlyOnThisDevice')
+                  : person.online
                   ? strings.get('online')
                   : strings.get('hiddenFromYou'));
 

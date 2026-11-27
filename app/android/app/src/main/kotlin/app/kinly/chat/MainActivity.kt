@@ -9,9 +9,11 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
 
 /**
  * Android glue: keeps Wi-Fi multicast alive for mDNS, runs the foreground
@@ -31,6 +33,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        AppLockChannel(this, flutterEngine.dartExecutor.binaryMessenger)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             CHANNEL,
@@ -41,6 +44,20 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
                 "isBatteryExempt" -> result.success(isBatteryExempt())
+                "setBackgroundService" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: true
+                    if (enabled) {
+                        startKinlyService()
+                    } else {
+                        stopService(Intent(this, KinlyService::class.java))
+                    }
+                    result.success(null)
+                }
+                "canInstallPackages" -> result.success(canInstallPackages())
+                "installApk" -> installApk(
+                    call.argument<String>("path"),
+                    result,
+                )
                 "openUrl" -> {
                     val url = call.argument<String>("url")
                     if (url.isNullOrBlank()) {
@@ -124,6 +141,56 @@ class MainActivity : FlutterActivity() {
             startActivity(intent)
         } catch (_: Exception) {
             startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+        }
+    }
+
+    private fun canInstallPackages(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
+        return packageManager.canRequestPackageInstalls()
+    }
+
+    private fun installApk(path: String?, result: MethodChannel.Result) {
+        if (path.isNullOrBlank()) {
+            result.error("bad_args", "path is required", null)
+            return
+        }
+        val file = File(path)
+        if (!file.exists() || file.length() == 0L) {
+            result.error("missing_file", "APK not found", null)
+            return
+        }
+        if (!canInstallPackages()) {
+            // Send the user to the system page; installing again will work.
+            try {
+                startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:$packageName"),
+                    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            } catch (_: Exception) {
+                startActivity(
+                    Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }
+            result.error("install_permission", "Allow installing unknown apps", null)
+            return
+        }
+        try {
+            val uri = FileProvider.getUriForFile(
+                this,
+                "$packageName.updates",
+                file,
+            )
+            val intent = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            startActivity(intent)
+            result.success(null)
+        } catch (error: Exception) {
+            result.error("install_failed", error.message, null)
         }
     }
 

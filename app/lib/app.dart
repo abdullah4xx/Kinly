@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'l10n/strings.dart';
 import 'screens/home.dart';
+import 'screens/lock_screen.dart';
 import 'screens/welcome.dart';
 import 'state/node_controller.dart';
 import 'state/settings.dart';
@@ -52,6 +53,7 @@ class KinlyApp extends StatelessWidget {
             );
           },
           home: RootGate(
+            settings: settings,
             controller: controller,
             dataDir: dataDir,
             knownName: knownName,
@@ -68,12 +70,14 @@ class KinlyApp extends StatelessWidget {
 class RootGate extends StatefulWidget {
   const RootGate({
     super.key,
+    required this.settings,
     required this.controller,
     required this.dataDir,
     required this.knownName,
     required this.initError,
   });
 
+  final AppSettings settings;
   final NodeController controller;
   final String dataDir;
   final String? knownName;
@@ -83,18 +87,66 @@ class RootGate extends StatefulWidget {
   State<RootGate> createState() => _RootGateState();
 }
 
-class _RootGateState extends State<RootGate> {
+class _RootGateState extends State<RootGate> with WidgetsBindingObserver {
+  static const _sessionGrace = Duration(minutes: 2);
+
   bool _entered = false;
+  bool _unlocked = false;
+  DateTime? _backgroundedAt;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // A returning device already has a name, so the welcome screen is skipped
     // and the node starts right away. A fresh device must see the welcome
     // screen first; that screen starts the node when the name is entered.
     _entered = widget.knownName != null;
     if (widget.knownName != null && widget.initError == null) {
       widget.controller.start(dataDir: widget.dataDir, name: widget.knownName!);
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      _backgroundedAt = DateTime.now();
+    }
+    if (state == AppLifecycleState.resumed) {
+      // The biometric session is only valid for a short grace period after
+      // the app was backgrounded.
+      final backgrounded = _backgroundedAt;
+      _backgroundedAt = null;
+      if (backgrounded != null) {
+        final elapsed = DateTime.now().difference(backgrounded);
+        if (elapsed > _sessionGrace) {
+          setState(() => _unlocked = false);
+        }
+      }
+    }
+  }
+
+  bool get _needsLock => widget.settings.appLock && !_unlocked;
+
+  Future<void> _unlock() async {
+    setState(() => _unlocked = true);
+  }
+
+  @override
+  void didUpdateWidget(RootGate oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.settings.appLock && !oldWidget.settings.appLock) {
+      // Turning the lock on re-arms the gate even for an already-unlocked
+      // session.
+      setState(() => _unlocked = false);
     }
   }
 
@@ -108,11 +160,17 @@ class _RootGateState extends State<RootGate> {
       );
     }
     if (!_entered) {
+      if (_needsLock) {
+        return LockScreen(onUnlocked: _unlock);
+      }
       return WelcomeScreen(
         controller: widget.controller,
         dataDir: widget.dataDir,
         onEntered: () => setState(() => _entered = true),
       );
+    }
+    if (_needsLock) {
+      return LockScreen(onUnlocked: _unlock);
     }
     return AnimatedBuilder(
       animation: widget.controller,
@@ -135,7 +193,13 @@ class _RootGateState extends State<RootGate> {
           );
         }
         if (!controller.ready) {
+          if (_needsLock) {
+            return LockScreen(onUnlocked: _unlock);
+          }
           return const _SplashScreen();
+        }
+        if (_needsLock) {
+          return LockScreen(onUnlocked: _unlock);
         }
         return HomeShell(controller: controller);
       },

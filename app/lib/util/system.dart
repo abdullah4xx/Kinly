@@ -35,3 +35,31 @@ Future<void> openUrl(String url) async {
   final opener = Platform.isMacOS ? 'open' : 'xdg-open';
   await Process.run(opener, [url]);
 }
+
+/// Turns the quiet foreground service on or off. Android only.
+Future<void> setBackgroundService(bool enabled) async {
+  if (!Platform.isAndroid) return;
+  try {
+    await _channel.invokeMethod<void>('setBackgroundService', {
+      'enabled': enabled,
+    });
+  } catch (_) {
+    // The service is an Android detail; other platforms keep running.
+  }
+}
+
+/// True when Android allows Kinly to install an APK.
+Future<bool> canInstallPackages() async {
+  if (!Platform.isAndroid) return false;
+  try {
+    return await _channel.invokeMethod<bool>('canInstallPackages') ?? false;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Hands a downloaded, verified APK to the system installer.
+Future<void> installApk(String path) async {
+  if (!Platform.isAndroid) return;
+  await _channel.invokeMethod<void>('installApk', {'path': path});
+}

@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="service_channel">Kinly connection</string>
+    <string name="service_channel_quiet">Kinly background</string>
+    <string name="service_channel_quiet_body">Silent notification that keeps messages arriving while Kinly is in the background.</string>
     <string name="service_title">Kinly is running</string>
+    <string name="service_title_quiet">Kinly is running</string>
     <string name="service_body">Listening for family messages on this network</string>
+    <string name="service_body_quiet">Receiving messages silently</string>
 </resources>

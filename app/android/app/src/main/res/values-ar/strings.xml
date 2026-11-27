@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="service_channel">اتصال كينلي</string>
+    <string name="service_channel_quiet">خلفية كينلي</string>
+    <string name="service_channel_quiet_body">إشعار صامت يبقي الرسائل تصل أثناء عمل كينلي في الخلفية.</string>
     <string name="service_title">كينلي يعمل</string>
+    <string name="service_title_quiet">كينلي يعمل</string>
     <string name="service_body">يستقبل رسائل العائلة على هذه الشبكة</string>
+    <string name="service_body_quiet">يستقبل الرسائل بصمت</string>
 </resources>

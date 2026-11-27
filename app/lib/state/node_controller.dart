@@ -285,12 +285,15 @@ class NodeController extends ChangeNotifier {
           structural = true;
         case 'message':
           if (event.deviceId.isNotEmpty) {
+            // Messages sent to ourselves are local echoes; they read as
+            // outgoing even though the node just stored them.
             _appendMessage(
               event.deviceId,
               ChatMessage(
                 id: event.messageId,
                 peer: event.deviceId,
-                outgoing: false,
+                outgoing: current.deviceId().isNotEmpty &&
+                    event.deviceId == current.deviceId(),
                 body: event.body,
                 state: event.state.isEmpty ? 'delivered' : event.state,
                 createdAt: event.offset.toInt(),
@@ -576,6 +579,48 @@ class NodeController extends ChangeNotifier {
   /// Fresh call id for a new call leg (offer / answer share it).
   String generateCallId() => const Uuid().v4();
 
+  /// Ring / answer window for an active call, in seconds.
+  static const _callRingSeconds = 30;
+
+  Timer? _callTimer;
+
+  /// Starts a ring/answer countdown for [isIncoming]; cleared when the call
+  /// ends or when an answer arrives.
+  void _armCallTimer({required bool incoming}) {
+    _callTimer?.cancel();
+    final timer = Timer(
+      const Duration(seconds: _callRingSeconds),
+      () {
+        final state = call;
+        if (state == null) return;
+        if (state.phase == CallPhase.ended) return;
+        // Nobody answered in time; end the leg politely.
+        if (state.phase == CallPhase.incoming) {
+          // Decline: tell the caller to move on.
+          unawaited(
+            sendCallSignal(
+              peer: state.peer,
+              callId: state.callId,
+              payload: jsonEncode(<String, dynamic>{'type': 'hangup'}),
+            ),
+          );
+          setCallPhase(CallPhase.ended);
+          return;
+        }
+        if (state.phase == CallPhase.outgoing) {
+          unawaited(
+            sendCallSignal(
+              peer: state.peer,
+              callId: state.callId,
+              payload: jsonEncode(<String, dynamic>{'type': 'hangup'}),
+            ),
+          );
+          setCallPhase(CallPhase.ended);
+        }
+      },
+    );
+    _callTimer = timer;
+  }
   /// Starts an outgoing call and forgets any previous one.
   void startOutgoingCall({
     required String peer,
@@ -588,6 +633,7 @@ class NodeController extends ChangeNotifier {
       isIncoming: false,
       video: video,
     )..phase = CallPhase.outgoing;
+    _armCallTimer(incoming: false);
     notifyListeners();
   }
 
@@ -604,6 +650,7 @@ class NodeController extends ChangeNotifier {
       isIncoming: true,
       video: video,
     )..phase = CallPhase.incoming;
+    _armCallTimer(incoming: true);
     notifyListeners();
   }
 
@@ -612,6 +659,10 @@ class NodeController extends ChangeNotifier {
     final state = call;
     if (state == null) return;
     state.phase = phase;
+    if (phase == CallPhase.ended || phase == CallPhase.ongoing) {
+      _callTimer?.cancel();
+      _callTimer = null;
+    }
     notifyListeners();
   }
 
@@ -635,6 +686,8 @@ class NodeController extends ChangeNotifier {
   Future<void> endCall() async {
     final state = call;
     if (state == null) return;
+    _callTimer?.cancel();
+    _callTimer = null;
     await sendCallSignal(
       peer: state.peer,
       callId: state.callId,
@@ -644,6 +697,8 @@ class NodeController extends ChangeNotifier {
   }
 
   void clearCall() {
+    _callTimer?.cancel();
+    _callTimer = null;
     call = null;
     notifyListeners();
   }

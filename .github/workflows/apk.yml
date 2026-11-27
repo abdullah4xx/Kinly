@@ -1,8 +1,8 @@
 name: APK
 
-# Builds an installable APK on every push to main and on demand. The APK is
-# signed with the debug key unless the signing secrets exist, which is enough
-# for sideloading test builds. Tagged releases use release.yml instead.
+# Builds a signed, installable APK on every push to main and on demand. The
+# APK is published to a rolling pre-release named `apk-<version>` so the owner
+# can download and install it directly from GitHub.
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   FLUTTER_VERSION: "3.50.0"
@@ -22,6 +22,30 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+
+      - name: Read version
+        run: |
+          VERSION=$(grep '^version:' app/pubspec.yaml | awk '{print $2}' | cut -d+ -f1)
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not read version from app/pubspec.yaml"
+            exit 1
+          fi
+          echo "VERSION_NAME=$VERSION" >> "$GITHUB_ENV"
+          echo "RELEASE_TAG=apk-$VERSION" >> "$GITHUB_ENV"
+
+      - name: Check signing secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is not set. Every APK must be signed with the stable key."
+              exit 1
+            fi
+          done
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -64,9 +88,24 @@ jobs:
         run: |
           cargo ndk \
             -t arm64-v8a \
-            --platform 24 \
+            --platform 28 \
             -o ../app/android/app/src/main/jniLibs \
             build --release
+
+      - name: Configure signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > app/android/keystore.jks
+          cat > app/android/key.properties <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=$GITHUB_WORKSPACE/app/android/keystore.jks
+          EOF
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -81,15 +120,32 @@ jobs:
           flutter pub get
           flutter build apk --release --target-platform android-arm64
 
-      - name: Name APK
+      - name: Verify and checksum
         run: |
+          APKSIGNER=$(find "$ANDROID_SDK_ROOT/build-tools" -name apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs app/build/app/outputs/flutter-apk/app-release.apk
           mkdir -p dist
           cp app/build/app/outputs/flutter-apk/app-release.apk \
-            "dist/kinly-${GITHUB_SHA::7}-arm64.apk"
+            "dist/kinly-${VERSION_NAME}-arm64.apk"
+          (cd dist && sha256sum "kinly-${VERSION_NAME}-arm64.apk" \
+            > "kinly-${VERSION_NAME}-arm64.apk.sha256")
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: kinly-apk
-          path: dist/*.apk
+          path: dist/*
           if-no-files-found: error
+
+      - name: Publish rolling pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Kinly ${{ env.VERSION_NAME }} (Android test build)
+          prerelease: true
+          make_latest: false
+          body: |
+            Signed arm64 test build of Kinly ${{ env.VERSION_NAME }}.
+            Install it over an older Kinly build signed with the same key.
+          files: dist/*
+          fail_on_unmatched_files: true

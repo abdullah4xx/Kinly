@@ -87,10 +87,6 @@ class Strings {
     'hiddenPeople': (en: 'People you hid', ar: 'الأشخاص الذين أخفيتهم'),
     'noHiddenPeople': (en: 'No one is hidden right now.', ar: 'لا يوجد أحد مخفي الآن.'),
     'notifications': (en: 'Notifications', ar: 'الإشعارات'),
-    'notificationsBody': (
-      en: 'Show a notification for new messages while the app is in the background.',
-      ar: 'إظهار إشعار عند وصول رسالة جديدة أثناء عمل التطبيق في الخلفية.',
-    ),
     'about': (en: 'About', ar: 'حول'),
     'version': (en: 'Version', ar: 'الإصدار'),
     'aboutBody': (
@@ -214,6 +210,168 @@ class Strings {
     'later': (en: 'Later', ar: 'لاحقًا'),
     'deleteConfirmTitle': (en: 'Delete this identity?', ar: 'حذف هذه الهوية؟'),
     'quitConfirmTitle': (en: 'Close Kinly?', ar: 'إغلاق كينلي؟'),
+    // Settings hub and the focused pages.
+    'account': (en: 'Account', ar: 'الحساب'),
+    'accountBody': (
+      en: 'Profile, name, photo, language, security and app lock.',
+      ar: 'الملف الشخصي والاسم والصورة واللغة والأمان وقفل التطبيق.',
+    ),
+    'appearanceBody': (
+      en: 'Accent color, chat wallpaper and motion.',
+      ar: 'اللون المميز وخلفية المحادثات والحركة.',
+    ),
+    'peopleBody': (
+      en: 'Everyone on your network and who can see you.',
+      ar: 'كل من على شبكتك ومن يستطيع رؤيتك.',
+    ),
+    'notificationsBody': (
+      en: 'Control background receiving and the silent notification.',
+      ar: 'تحكم في استقبال الرسائل في الخلفية والإشعار الصامت.',
+    ),
+    'updates': (en: 'Updates', ar: 'التحديثات'),
+    'danger': (en: 'Danger zone', ar: 'منطقة الخطر'),
+    'updatesBody': (
+      en: 'Check, download and install a new version.',
+      ar: 'تحقق من إصدار جديد ونزّله وثبّته.',
+    ),
+    'aboutBodySettings': (
+      en: 'Version, source code and who made Kinly.',
+      ar: 'الإصدار والشيفرة المصدرية ومن صنع كينلي.',
+    ),
+    'dangerBody': (
+      en: 'Delete this device identity or quit the app.',
+      ar: 'احذف هوية هذا الجهاز أو أغلق التطبيق.',
+    ),
+    'appLock': (en: 'App lock', ar: 'قفل التطبيق'),
+    'appLockBody': (
+      en: 'Ask for your fingerprint or device PIN before Kinly opens.',
+      ar: 'اطلب بصمة إصبعك أو رمز الجهاز قبل فتح كينلي.',
+    ),
+    'appLockTitle': (en: 'Unlock Kinly', ar: 'فتح كينلي'),
+    'appLockSubtitle': (
+      en: 'Use your fingerprint or device PIN.',
+      ar: 'استخدم بصمة إصبعك أو رمز الجهاز.',
+    ),
+    'unlock': (en: 'Unlock', ar: 'فتح'),
+    'unlockWithFingerprint': (
+      en: 'Unlock with fingerprint',
+      ar: 'الفتح بالبصمة',
+    ),
+    'usePin': (en: 'Use device PIN', ar: 'استخدام رمز الجهاز'),
+    'lockFailed': (
+      en: 'Could not unlock. Try again.',
+      ar: 'تعذّر الفتح. حاول مجددًا.',
+    ),
+    'noBiometrics': (
+      en: 'No fingerprint or device PIN is set. Set one in Android settings, or turn the app lock off.',
+      ar: 'لا توجد بصمة أو رمز جهاز مسجّل. سجّله من إعدادات أندرويد، أو أوقف قفل التطبيق.',
+    ),
+    'appLockUnavailable': (
+      en: 'This device cannot use the app lock.',
+      ar: 'هذا الجهاز لا يدعم قفل التطبيق.',
+    ),
+    'disableLock': (en: 'Turn off app lock', ar: 'إيقاف قفل التطبيق'),
+    'appLockEnabled': (en: 'App lock is on', ar: 'قفل التطبيق مفعّل'),
+    'backgroundReceive': (
+      en: 'Receive messages in background',
+      ar: 'استقبال الرسائل في الخلفية',
+    ),
+    'backgroundReceiveBody': (
+      en: 'Kinly shows a silent notification and keeps receiving while closed.',
+      ar: 'يعرض كينلي إشعارًا صامتًا ويستمر في الاستقبال أثناء الإغلاق.',
+    ),
+    'backgroundReceiveOff': (
+      en: 'When off, messages arrive only while Kinly is open. Android requires the silent notification for background delivery.',
+      ar: 'عند الإيقاف، تصل الرسائل فقط أثناء فتح كينلي. أندرويد يفرض الإشعار الصامت لاستقبال الرسائل في الخلفية.',
+    ),
+    'onlyOnThisDevice': (
+      en: 'Only on this device',
+      ar: 'على هذا الجهاز فقط',
+    ),
+    'visibleToThem': (en: 'Visible to them', ar: 'ظاهر له'),
+    'people': (en: 'People', ar: 'الأشخاص'),
+    'allPeople': (en: 'Everyone here', ar: 'كل الموجودين'),
+    'camera': (en: 'Camera', ar: 'الكاميرا'),
+    'takePhoto': (en: 'Take a photo', ar: 'التقط صورة'),
+    'chooseRecipient': (en: 'Send to', ar: 'أرسل إلى'),
+    'sendPhoto': (en: 'Send photo', ar: 'إرسال الصورة'),
+    'retake': (en: 'Retake', ar: 'إعادة التصوير'),
+    'photoSent': (en: 'Photo sent', ar: 'تم إرسال الصورة'),
+    'cameraFailed': (
+      en: 'Could not open the camera.',
+      ar: 'تعذّر فتح الكاميرا.',
+    ),
+    'scanQr': (en: 'Scan a code', ar: 'مسح رمز'),
+    'scanQrBody': (
+      en: 'Point the camera at another device’s Kinly code.',
+      ar: 'وجّه الكاميرا نحو رمز كينلي على الجهاز الآخر.',
+    ),
+    'qrInvalid': (
+      en: 'This is not a Kinly code.',
+      ar: 'هذا ليس رمز كينلي.',
+    ),
+    'qrVerified': (
+      en: 'Code read. Compare the numbers with the other person.',
+      ar: 'تم قراءة الرمز. قارن الأرقام مع الشخص الآخر.',
+    ),
+    'ocrTitle': (en: 'Read text from a photo', ar: 'قراءة نص من صورة'),
+    'ocrBody': (
+      en: 'Take a photo of a page, then select and copy the text.',
+      ar: 'التقط صورة لصفحة، ثم حدّد النص وانسخه.',
+    ),
+    'recognizingText': (en: 'Reading text…', ar: 'جارٍ قراءة النص…'),
+    'noTextFound': (
+      en: 'No readable text was found.',
+      ar: 'لم يتم العثور على نص مقروء.',
+    ),
+    'selectAll': (en: 'Select all', ar: 'تحديد الكل'),
+    'copyText': (en: 'Copy text', ar: 'نسخ النص'),
+    'closeCamera': (en: 'Close camera', ar: 'إغلاق الكاميرا'),
+    'wallpaper': (en: 'Chat wallpaper', ar: 'خلفية المحادثات'),
+    'wallpaperBody': (
+      en: 'Pick a pattern that follows the accent color, or a photo from your gallery.',
+      ar: 'اختر نقشًا يتبع اللون المميز، أو صورة من معرضك.',
+    ),
+    'wallpaperDefault': (en: 'Default', ar: 'الافتراضي'),
+    'wallpaperNone': (en: 'None', ar: 'بدون'),
+    'wallpaperCustom': (en: 'Photo from gallery', ar: 'صورة من المعرض'),
+    'chatWallpaper': (en: 'This chat’s wallpaper', ar: 'خلفية هذه المحادثة'),
+    'useDefaultWallpaper': (en: 'Use the default', ar: 'استخدام الافتراضي'),
+    'removeWallpaper': (en: 'Remove wallpaper', ar: 'إزالة الخلفية'),
+    'downloading': (en: 'Downloading', ar: 'جارٍ التنزيل'),
+    'verifying': (en: 'Verifying…', ar: 'جارٍ التحقق…'),
+    'readyToInstall': (en: 'Ready to install', ar: 'جاهز للتثبيت'),
+    'installing': (en: 'Opening the installer…', ar: 'جارٍ فتح المثبّت…'),
+    'installUpdate': (en: 'Install update', ar: 'تثبيت التحديث'),
+    'cancelDownload': (en: 'Cancel download', ar: 'إلغاء التنزيل'),
+    'downloadFailed': (en: 'Download failed', ar: 'فشل التنزيل'),
+    'verifyFailed': (
+      en: 'The downloaded file is damaged or incorrect.',
+      ar: 'الملف الذي تم تنزيله تالف أو غير صحيح.',
+    ),
+    'installPermission': (
+      en: 'Allow Kinly to install apps, then tap install again.',
+      ar: 'اسمح لكينلي بتثبيت التطبيقات، ثم اضغط تثبيت مرة أخرى.',
+    ),
+    'releaseNotes': (en: 'What is new', ar: 'الجديد'),
+    'latestVersion': (en: 'Latest version', ar: 'أحدث إصدار'),
+    'currentVersion': (en: 'Installed version', ar: 'الإصدار المثبّت'),
+    'noAnswer': (en: 'No answer', ar: 'لا يوجد رد'),
+    'peerBusy': (en: 'The other person is on another call', ar: 'الشخص الآخر في مكالمة أخرى'),
+    'peerOffline': (en: 'The other person is offline', ar: 'الشخص الآخر غير متصل'),
+    'callEnded': (en: 'Call ended', ar: 'انتهت المكالمة'),
+    'switchCamera': (en: 'Switch camera', ar: 'تبديل الكاميرا'),
+    'speaker': (en: 'Speaker', ar: 'السماعة الخارجية'),
+    'earpiece': (en: 'Earpiece', ar: 'سماعة الأذن'),
+    'cameraOff': (en: 'Camera off', ar: 'الكاميرا مغلقة'),
+    'callPermissions': (
+      en: 'Kinly needs the microphone and camera for calls.',
+      ar: 'يحتاج كينلي إلى الميكروفون والكاميرا للمكالمات.',
+    ),
+    'backgroundReceiveOn': (
+      en: 'Background receiving is on',
+      ar: 'استقبال الخلفية مفعّل',
+    ),
   };
 
   String get(String key) {

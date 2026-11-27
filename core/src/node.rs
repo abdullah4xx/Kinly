@@ -524,6 +524,22 @@ pub async fn start(config: Config) -> Result<NodeHandle> {
     };
     let profile = Arc::new(Profile::new(name.clone(), avatar));
 
+    // The device always knows about itself, so a "self chat" can exist from
+    // the first launch instead of appearing only after the first profile
+    // change. The row keeps the per-person visibility semantics but a local
+    // user has nobody to hide from.
+    let self_device_id = identity.device_id();
+    let self_person = Person {
+        device_id: self_device_id.clone(),
+        name: name.clone(),
+        avatar: avatar.clone(),
+        hidden: false,
+        hidden_by_peer: false,
+        identity_created_at: identity.created_at(),
+        last_seen: None,
+    };
+    let _ = storage.upsert_person_keep_visibility(&self_person);
+
     let downloads_dir = config.data_dir.join("downloads");
     std::fs::create_dir_all(&downloads_dir)?;
 
@@ -888,6 +904,19 @@ async fn set_profile(
         name: state.profile.name(),
         avatar: state.profile.avatar(),
     });
+
+    // Keep the local self row in sync after a rename or photo change so the
+    // self chat follows the new profile without a full restart.
+    let self_person = Person {
+        device_id: state.device_id.clone(),
+        name: state.profile.name().read().await.clone(),
+        avatar: state.profile.avatar().read().await.clone(),
+        hidden: false,
+        hidden_by_peer: false,
+        identity_created_at: state.identity.created_at(),
+        last_seen: None,
+    };
+    let _ = state.storage.upsert_person_keep_visibility(&self_person);
     Ok(())
 }
 
@@ -901,6 +930,11 @@ async fn handle_session_event(state: &mut NodeState, event: SessionEvent) {
             out_tx,
             shutdown,
         } => {
+            // A device never opens a session with itself; ignore stray local
+            // sessions so a self connection cannot loop back into the actor.
+            if device_id == state.device_id {
+                return;
+            }
             // Keep the session initiated by the device with the smaller ID so
             // simultaneous connections resolve to one session on both sides.
             let keep_new = if initiator {
@@ -1212,6 +1246,22 @@ fn emit(events: &broadcast::Sender<Event>, event: Event) {
 }
 
 async fn send_message(state: &mut NodeState, peer: &str, body: &str) -> Result<Uuid> {
+    // A message to ourselves is a local echo: it is stored in the same database
+    // and shown as outgoing, without any network frame or duplicate event.
+    if peer == state.device_id.as_str() {
+        let id = Uuid::new_v4();
+        let message = MessageRow {
+            id,
+            peer: peer.to_string(),
+            direction: "out".into(),
+            body: body.to_string(),
+            state: "sent".into(),
+            created_at: identity::unix_now(),
+        };
+        state.storage.insert_message(&message)?;
+        emit(&state.events, Event::Message { device_id: peer.to_string(), message });
+        return Ok(id);
+    }
     let person = state
         .storage
         .person(peer)?
@@ -1561,6 +1611,11 @@ async fn accept_file_offer(state: &mut NodeState, peer: &str, offer: FileOffer) 
 }
 
 async fn set_visibility(state: &mut NodeState, peer: &str, visible: bool) -> Result<()> {
+    // Visibility is a relationship between two different people; there is
+    // nothing to hide from ourselves.
+    if peer == state.device_id.as_str() {
+        return Ok(());
+    }
     if state.storage.person(peer)?.is_none() {
         bail!("unknown peer");
     }

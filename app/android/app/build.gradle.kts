@@ -28,8 +28,8 @@ android {
 
     defaultConfig {
         applicationId = "app.kinly.chat"
-        // Android 7.0 (API 24) is the oldest version Flutter supports.
-        minSdk = maxOf(24, flutter.minSdkVersion)
+        // Kinly supports Android 9 (API 28) through Android 16 and newer.
+        minSdk = 28
         targetSdk = flutter.targetSdkVersion
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
@@ -51,6 +51,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // A dev build installs beside the release build without wiping it.
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+        }
         release {
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
@@ -59,6 +64,11 @@ android {
             }
         }
     }
+}
+
+dependencies {
+    // BiometricPrompt is used by the app-lock MethodChannel.
+    implementation("androidx.biometric:biometric:1.1.0")
 }
 
 kotlin {
