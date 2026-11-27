@@ -209,7 +209,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ? null
                       : () => showPeerSecurity(context, controller, person),
                   onCall: () => _startCall(video: false),
-                  onLongPress: () => _startCall(video: true),
+                  onVideoCall: () => _startCall(video: true),
                 ),
                 if (person != null &&
                     !controller.isSelf(_peer) &&
@@ -286,7 +286,7 @@ class _ChatHeader extends StatelessWidget {
     required this.deviceId,
     required this.onVerify,
     required this.onCall,
-    this.onLongPress,
+    this.onVideoCall,
   });
 
   final NodeController controller;
@@ -294,7 +294,7 @@ class _ChatHeader extends StatelessWidget {
   final String deviceId;
   final VoidCallback? onVerify;
   final VoidCallback onCall;
-  final VoidCallback? onLongPress;
+  final VoidCallback? onVideoCall;
 
   @override
   Widget build(BuildContext context) {
@@ -390,32 +390,27 @@ class _ChatHeader extends StatelessWidget {
               ),
             ),
           ),
-          if (person != null && !isSelf)
-            NeuIconButton(
-              icon: person!.visible
-                  ? Icons.visibility_rounded
-                  : Icons.visibility_off_rounded,
-              size: 42,
-              iconSize: 18,
-              tooltip: person!.visible
-                  ? strings.get('visibility')
-                  : strings.get('hidden'),
-              onPressed: () =>
-                  controller.setVisibility(deviceId, !person!.visible),
-            ),
-          const SizedBox(width: 8),
           if (!isSelf) ...[
+            const SizedBox(width: 4),
             // Self chats have no peer to call.
             NeuIconButton(
               icon: Icons.call_rounded,
               accent: true,
-              size: 44,
-              iconSize: 20,
+              size: 42,
+              iconSize: 19,
               tooltip: strings.get('call'),
               onPressed: onCall,
-              // Long press starts a video call (PLAN.md phase 3, Android only).
-              onLongPress: onLongPress,
             ),
+            if (onVideoCall != null) ...[
+              const SizedBox(width: 4),
+              NeuIconButton(
+                icon: Icons.videocam_rounded,
+                size: 42,
+                iconSize: 19,
+                tooltip: strings.get('videoCall'),
+                onPressed: onVideoCall,
+              ),
+            ],
           ],
         ],
       ),

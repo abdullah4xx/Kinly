@@ -45,6 +45,8 @@ class _CallScreenState extends State<CallScreen> {
   bool _connecting = true;
   bool _micOn = true;
   bool _cameraOn = true;
+  bool _speakerOn = true;
+  bool _frontCamera = true;
   bool _remoteSet = false;
   String? _appliedAnswerSdp;
   int _appliedCandidates = 0;
@@ -124,6 +126,7 @@ class _CallScreenState extends State<CallScreen> {
         await pc.addTrack(track, stream);
       }
       _localRenderer.srcObject = stream;
+      await Helper.setSpeakerphoneOn(_speakerOn);
       if (widget.video) setState(() {});
 
       if (widget.isIncoming) {
@@ -224,6 +227,22 @@ class _CallScreenState extends State<CallScreen> {
     for (final track in tracks) {
       track.enabled = enabled;
     }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _toggleSpeaker() async {
+    final enabled = !_speakerOn;
+    _speakerOn = enabled;
+    await Helper.setSpeakerphoneOn(enabled);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _flipCamera() async {
+    final tracks = _localStream?.getVideoTracks() ?? const <MediaStreamTrack>[];
+    if (tracks.isEmpty) return;
+    final switched = await Helper.switchCamera(tracks.first);
+    if (!switched) return;
+    _frontCamera = !_frontCamera;
     if (mounted) setState(() {});
   }
 
@@ -344,6 +363,18 @@ class _CallScreenState extends State<CallScreen> {
                       tooltip: strings.get('mute'),
                       onPressed: _toggleMic,
                     ),
+                    const SizedBox(width: 12),
+                    NeuIconButton(
+                      icon: _speakerOn
+                          ? Icons.volume_up_rounded
+                          : Icons.volume_off_rounded,
+                      size: 56,
+                      iconSize: 24,
+                      accent: !_speakerOn,
+                      tooltip: strings.get('speaker'),
+                      onPressed: _toggleSpeaker,
+                    ),
+                    const SizedBox(width: 12),
                   ],
                   const SizedBox(width: 18),
                   _CallActionButton(
@@ -380,7 +411,7 @@ class _CallScreenState extends State<CallScreen> {
             height: 160,
             child: RTCVideoView(
               _localRenderer,
-              mirror: true,
+              mirror: _frontCamera,
               objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
             ),
           ),
@@ -420,11 +451,28 @@ class _CallScreenState extends State<CallScreen> {
                     onPressed: _toggleMic,
                   ),
                   NeuIconButton(
+                    icon: _speakerOn
+                        ? Icons.volume_up_rounded
+                        : Icons.volume_off_rounded,
+                    size: 40,
+                    iconSize: 18,
+                    accent: !_speakerOn,
+                    tooltip: strings.get('speaker'),
+                    onPressed: _toggleSpeaker,
+                  ),
+                  NeuIconButton(
                     icon: _cameraOn ? Icons.videocam : Icons.videocam_off,
                     size: 40,
                     iconSize: 18,
                     tooltip: strings.get('videoCall'),
                     onPressed: _toggleCamera,
+                  ),
+                  NeuIconButton(
+                    icon: Icons.cameraswitch_rounded,
+                    size: 40,
+                    iconSize: 18,
+                    tooltip: strings.get('flipCamera'),
+                    onPressed: _flipCamera,
                   ),
                   NeuIconButton(
                     icon: Icons.call_end,

@@ -148,6 +148,7 @@ class Strings {
     'endCall': (en: 'End call', ar: 'إنهاء المكالمة'),
     'mute': (en: 'Mute', ar: 'كتم الصوت'),
     'unmute': (en: 'Unmute', ar: 'إلغاء الكتم'),
+    'flipCamera': (en: 'Switch camera', ar: 'تبديل الكاميرا'),
     'youHidThem': (en: 'You hid this person', ar: 'أنت أخفيت هذا الشخص'),
     'theyHidYou': (en: 'This person hid from you', ar: 'هذا الشخص أخفى نفسه عنك'),
     'hiddenChatNotice': (

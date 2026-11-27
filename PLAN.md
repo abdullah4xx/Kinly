@@ -87,13 +87,13 @@ ui-reference.png    <- reference UI design image (see section 4). Must sit in th
   - Round avatar with a soft ring.
   - Bold name, and below it the last message in small gray text (single line, truncated).
   - Right side: **time** (accent color if there are unread messages, gray otherwise) and below it an **unread badge** (accent pill; the count caps at `99+`).
-  - **Visibility toggle** (eye icon): small neumorphic control. When off, it must look clearly different (crossed-out eye, muted color).
+  - **Visibility toggle** (eye icon): on the People page in 1.1.3; when off, the person must look clearly different (crossed-out eye, muted color).
   - Very thin dividers between rows.
   - Online/offline: a small dot on the avatar.
 - **Bottom bar:** a floating pill with round raised icon buttons: **Chats** (active, accent color), **Account** (security, profile, app lock), **Settings** (habits, appearance, people, notifications, updates, about, danger), **Camera** (take a photo and send it, scan a Kinly QR code, OCR text). The pill animates the active icon with a scale + fade that respects the reduce-motion setting.
 
 ### 4.3 Chat screen (right side of the image)
-- **Header:** round back button (accent arrow), avatar, name, and below it **"Typing..."** while the peer types (otherwise "online" / "last seen"), and a round call button (accent phone icon). The visibility toggle is also available here.
+- **Header:** round back button (accent arrow), avatar, name, and below it **"Typing..."** while the peer types (otherwise "online" / "last seen"), and round voice/video call buttons (accent phone/video icons). Visibility lives on the People page, not in the chat header.
 - **Date separator:** small centered text ("Today").
 - **Bubbles:**
   - Received: dark raised surface, white text.

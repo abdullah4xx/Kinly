@@ -31,7 +31,7 @@ class SettingsPageBody extends StatelessWidget {
       child: ListView(
         padding: EdgeInsetsDirectional.fromSTEB(
           20,
-          embedded ? 18 : 12,
+          embedded ? 16 : 12,
           20,
           embedded ? 120 : 32,
         ),
@@ -61,8 +61,8 @@ class SettingsPageBody extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          if (header != null) ...[header!, const SizedBox(height: 22)],
+          const SizedBox(height: 16),
+          if (header != null) ...[header!, const SizedBox(height: 20)],
           ...children,
         ],
       ),
@@ -113,7 +113,7 @@ class SettingsLinkRow extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(Tokens.radiusLarge),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
             Icon(
@@ -121,7 +121,7 @@ class SettingsLinkRow extends StatelessWidget {
               size: 19,
               color: danger ? Tokens.danger : Tokens.textMuted,
             ),
-            const SizedBox(width: 13),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,7 +135,7 @@ class SettingsLinkRow extends StatelessWidget {
                     ),
                   ),
                   if (subtitle.isNotEmpty) ...[
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 4),
                     Text(
                       subtitle,
                       maxLines: 2,
@@ -203,7 +203,7 @@ class SettingsToggleRow extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Text(
                     subtitle,
                     style: const TextStyle(
