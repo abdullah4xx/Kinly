@@ -608,42 +608,6 @@ class _PersonTile extends StatelessWidget {
               ],
             ),
             const SizedBox(width: 6),
-            if (!isSelf)
-              GestureDetector(
-                onTap: () =>
-                    controller.setVisibility(person.deviceId, !person.visible),
-                child: Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Tokens.surface,
-                      boxShadow: [
-                        BoxShadow(
-                          color: withOpacity(Tokens.shadowDark, 0.6),
-                          offset: const Offset(2, 2),
-                          blurRadius: 5,
-                        ),
-                        BoxShadow(
-                          color: withOpacity(Tokens.shadowLight, 0.3),
-                          offset: const Offset(-2, -2),
-                          blurRadius: 5,
-                        ),
-                      ],
-                    ),
-                    child: Icon(
-                      person.visible
-                          ? Icons.visibility_rounded
-                          : Icons.visibility_off_rounded,
-                      size: 17,
-                      color: person.visible ? accent : Tokens.textMuted,
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),
