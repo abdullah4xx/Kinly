@@ -114,7 +114,10 @@ class _CallScreenState extends State<CallScreen> {
       });
       if (!mounted) return;
       _localStream = stream;
-      await pc.addStream(stream);
+      // Unified Plan WebRTC has no addStream(); attach each track instead.
+      for (final track in stream.getTracks()) {
+        await pc.addTrack(track, stream);
+      }
       _localRenderer.srcObject = stream;
       if (widget.video) setState(() {});
 
