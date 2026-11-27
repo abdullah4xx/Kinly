@@ -31,16 +31,24 @@
 
 ## Release
 
-- Page: <https://github.com/abdullah4xx/Kinly/releases/tag/apk-1.1.3>
+- Page: <https://github.com/abdullah4xx/Kinly/releases/tag/v1.1.3>
 - APK:
-  <https://github.com/abdullah4xx/Kinly/releases/download/apk-1.1.3/kinly-1.1.3-arm64.apk>
+  <https://github.com/abdullah4xx/Kinly/releases/download/v1.1.3/kinly-1.1.3-arm64.apk>
+- Size: 128,502,192 bytes
 - SHA-256:
-  `PLACEHOLDER - filled after the first CI build`
+  `35e35af2b208066b059b77f15e3cedd4f535ce2cb8e2602d76a00d7f6c550b37`
+- Also published as the rolling pre-release
+  <https://github.com/abdullah4xx/Kinly/releases/tag/apk-1.1.3>.
 
 ## CI
 
-- CI: run `PLACEHOLDER - filled after the first CI build` (green).
-- APK: run `PLACEHOLDER - filled after the first CI build` (green).
+- CI: run `45975068734` (green).
+- APK: run `45975068637` (green, signed with the stable key and verified with
+  `apksigner`); the APK was uploaded to this release from that build and the
+  checksum was re-verified locally.
+- The tag-triggered Release workflow hit a transient Maven Central `429` while
+  resolving Gradle plugins; the same APK from the green APK run was used for
+  the manual publish instead of re-running the build.
 
 ## Verification checklist (on device)
 
