@@ -26,9 +26,9 @@ abstract final class Tokens {
   static const gap = 16.0;
   static const pagePadding = EdgeInsets.symmetric(horizontal: 20);
 
-  /// Preset accents shown in Settings -> Appearance. They all keep at least a
-  /// 3:1 contrast ratio against the background.
+  /// Preset accents shown in Settings -> Appearance.
   static const accentPresets = <({String name, Color color})>[
+    (name: 'Black', color: Color(0xFF000000)),
     (name: 'Coral', color: Color(0xFFE8505B)),
     (name: 'Amber', color: Color(0xFFE7A33E)),
     (name: 'Lime', color: Color(0xFF9BCB4A)),
@@ -103,10 +103,12 @@ ThemeData buildTheme(Color accent, String language) {
       onSurface: Tokens.textPrimary,
       error: Tokens.danger,
     ),
-    textTheme: base.textTheme.apply(
-      bodyColor: Tokens.textPrimary,
-      displayColor: Tokens.textPrimary,
-    ),
+    textTheme: base.textTheme
+        .apply(
+          bodyColor: Tokens.textPrimary,
+          displayColor: Tokens.textPrimary,
+        )
+        .apply(decoration: TextDecoration.none),
     splashFactory: NoSplash.splashFactory,
     highlightColor: Colors.transparent,
     dividerColor: withOpacity(Colors.white, 0.04),

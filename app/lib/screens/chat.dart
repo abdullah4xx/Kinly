@@ -241,11 +241,17 @@ class _ChatScreenState extends State<ChatScreen> {
                               strings: strings,
                               onCancel: () =>
                                   controller.cancelTransfer(transfer),
-                              onCopyPath: transfer.path.isEmpty
+                              onCopyPath:
+                                  transfer.path.isEmpty &&
+                                      transfer.savedPath.isEmpty
                                   ? null
                                   : () async {
                                       await Clipboard.setData(
-                                        ClipboardData(text: transfer.path),
+                                        ClipboardData(
+                                          text: transfer.savedPath.isNotEmpty
+                                              ? transfer.savedPath
+                                              : transfer.path,
+                                        ),
                                       );
                                       if (!context.mounted) return;
                                       _snack(strings.get('copied'));
@@ -705,6 +711,11 @@ class _StateMark extends StatelessWidget {
   }
 }
 
+bool _isImageName(String name) {
+  final ext = name.toLowerCase().split('.').last;
+  return {'png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 'heic', 'heif'}.contains(ext);
+}
+
 class _TransferBubble extends StatelessWidget {
   const _TransferBubble({
     required this.transfer,
@@ -763,6 +774,29 @@ class _TransferBubble extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (transfer.done &&
+                    _isImageName(transfer.name) &&
+                    transfer.path.isNotEmpty &&
+                    File(transfer.path).existsSync()) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.file(
+                      File(transfer.path),
+                      width: double.infinity,
+                      height: 220,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        height: 120,
+                        color: withOpacity(Colors.black, 0.2),
+                        child: Icon(
+                          Icons.broken_image_rounded,
+                          color: secondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 Row(
                   children: [
                     Icon(

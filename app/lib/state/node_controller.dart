@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../src/rust/api.dart';
+import '../util/system.dart';
 import 'settings.dart';
 
 export '../src/rust/api.dart' show PersonInfo;
@@ -70,6 +71,7 @@ class TransferInfo {
   int total;
   int received;
   String path;
+  String savedPath = '';
   bool failed;
   bool done;
   bool cancelled;
@@ -119,6 +121,8 @@ class CallState {
   bool speakerOn = true;
   String? error;
   Map<String, dynamic>? lastSignal;
+  String? offerSdp;
+  final List<Map<String, dynamic>> candidates = [];
 
   bool get isOngoing => phase == CallPhase.ongoing;
   bool get isIncomingCall => phase == CallPhase.incoming;
@@ -331,6 +335,20 @@ class NodeController extends ChangeNotifier {
               ..done = true
               ..path = event.path
               ..received = transfer.total;
+            if (!transfer.outgoing && event.path.isNotEmpty) {
+              // Keep the app-internal copy, but also put received files where
+              // the user can find them in Android's Downloads/Kinly.
+              unawaited(
+                saveToDownloads(path: event.path, name: transfer.name).then((
+                  saved,
+                ) {
+                  if (saved != null && saved.isNotEmpty) {
+                    transfer.savedPath = saved;
+                    if (!_disposed) notifyListeners();
+                  }
+                }),
+              );
+            }
           }
         case 'file_failed':
           final transfer = _transfers[event.transferId];
@@ -355,9 +373,6 @@ class NodeController extends ChangeNotifier {
   }
 
   void _handleCallSignal(BridgeEvent event) {
-    final state = call;
-    if (state == null || state.callId != event.transferId) return;
-    if (state.phase == CallPhase.ended) return;
     Map<String, dynamic>? payload;
     if (event.body.isNotEmpty) {
       try {
@@ -367,25 +382,56 @@ class NodeController extends ChangeNotifier {
         // Not JSON (or not for us); ignore malformed signals.
       }
     }
-    if (state.phase == CallPhase.outgoing) {
-      if (payload != null && payload['type'] == 'answer') {
-        state.phase = CallPhase.ongoing;
-        state.error = null;
-        notifyListeners();
-      } else if (payload != null && payload['type'] == 'hangup') {
-        state.phase = CallPhase.ended;
-        notifyListeners();
-      }
+
+    var state = call;
+    // A caller sends the SDP offer first; start the incoming call from it.
+    if (state == null) {
+      if (payload == null || payload['type'] != 'offer') return;
+      final sdp = payload['sdp'];
+      startIncomingCall(
+        peer: event.deviceId,
+        callId: event.transferId,
+        video: payload['video'] == true,
+      );
+      state = call;
+      if (state != null && sdp is String) state.offerSdp = sdp;
+      state?.lastSignal = payload;
+      notifyListeners();
       return;
     }
-    if (state.phase == CallPhase.incoming) {
-      // An offer (or ICE) from the caller; the call screen consumes it once
-      // the user accepts.
-      if (payload != null) {
-        state.lastSignal = payload;
-        notifyListeners();
+
+    if (state.callId != event.transferId) return;
+    if (state.phase == CallPhase.ended) return;
+
+    if (payload != null) {
+      state.lastSignal = payload;
+      if (payload['type'] == 'offer') {
+        final sdp = payload['sdp'];
+        if (sdp is String) state.offerSdp = sdp;
+      }
+      if (payload['type'] == 'candidate') {
+        final candidate = payload['candidate'];
+        if (candidate is String && candidate.isNotEmpty) {
+          state.candidates.add(<String, dynamic>{
+            'candidate': candidate,
+            'sdpMid': payload['sdpMid'],
+            'sdpMLineIndex': payload['sdpMLineIndex'],
+          });
+        }
       }
     }
+
+    if (payload != null && payload['type'] == 'hangup') {
+      state.phase = CallPhase.ended;
+      _callTimer?.cancel();
+      _callTimer = null;
+    } else if (state.phase == CallPhase.outgoing &&
+        payload != null &&
+        payload['type'] == 'answer') {
+      // The call screen applies the remote description; controller marks intent.
+      state.error = null;
+    }
+    notifyListeners();
   }
 
   void _appendMessage(String peer, ChatMessage message) {

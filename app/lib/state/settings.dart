@@ -56,7 +56,6 @@ class AppSettings extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final stored = prefs.getInt(_accentKey);
     final accent = stored == null ? Tokens.defaultAccent : Color(stored);
-    final safeAccent = accentTooClose(accent) ? Tokens.defaultAccent : accent;
     Map<String, String> chatWallpapers = const {};
     final raw = prefs.getString(_chatWallpapersKey);
     if (raw != null && raw.isNotEmpty) {
@@ -73,7 +72,7 @@ class AppSettings extends ChangeNotifier {
     }
     return AppSettings._(
       prefs,
-      safeAccent,
+      accent,
       prefs.getString(_languageKey) ?? 'en',
       prefs.getBool(_motionKey) ?? false,
       prefs.getBool(_backgroundKey) ?? prefs.getBool('notifications') ?? true,
@@ -84,7 +83,6 @@ class AppSettings extends ChangeNotifier {
   }
 
   Future<void> setAccent(Color color) async {
-    if (accentTooClose(color)) return;
     _accent = color;
     await _prefs.setInt(_accentKey, color.toARGB32());
     notifyListeners();

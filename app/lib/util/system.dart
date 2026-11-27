@@ -58,6 +58,20 @@ Future<bool> canInstallPackages() async {
   }
 }
 
+/// Copies a received file into the public Android Downloads/Kinly folder.
+/// Returns the saved URI/path on Android; no-op on other platforms.
+Future<String?> saveToDownloads({required String path, String? name}) async {
+  if (!Platform.isAndroid) return null;
+  try {
+    return await _channel.invokeMethod<String>('saveToDownloads', {
+      'path': path,
+      'name': name ?? path.split(RegExp(r'[/\\]')).last,
+    });
+  } catch (_) {
+    return null;
+  }
+}
+
 /// Hands a downloaded, verified APK to the system installer.
 Future<void> installApk(String path) async {
   if (!Platform.isAndroid) return;

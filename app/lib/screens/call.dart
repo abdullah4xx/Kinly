@@ -45,17 +45,22 @@ class _CallScreenState extends State<CallScreen> {
   bool _connecting = true;
   bool _micOn = true;
   bool _cameraOn = true;
+  bool _remoteSet = false;
+  String? _appliedAnswerSdp;
+  int _appliedCandidates = 0;
 
   CallState? get _call => widget.controller.call;
 
   @override
   void initState() {
     super.initState();
+    widget.controller.addListener(_onControllerChanged);
     _boot();
   }
 
   @override
   void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
     _timer?.cancel();
     _timer = null;
     unawaited(_pc?.dispose());
@@ -130,7 +135,11 @@ class _CallScreenState extends State<CallScreen> {
         await widget.controller.sendCallSignal(
           peer: widget.peer,
           callId: widget.callId,
-          payload: jsonEncode(<String, dynamic>{'type': 'offer', 'sdp': offer.sdp}),
+          payload: jsonEncode(<String, dynamic>{
+            'type': 'offer',
+            'sdp': offer.sdp,
+            'video': widget.video,
+          }),
         );
         if (mounted) setState(() => _connecting = false);
       }
@@ -142,10 +151,13 @@ class _CallScreenState extends State<CallScreen> {
 
   Future<void> _accept() async {
     final pc = _pc;
-    final sdp = _call?.lastSignal?['sdp'];
-    if (pc == null || sdp is! String) return;
+    if (pc == null || _remoteSet) return;
+    final sdp = _call?.offerSdp ?? _call?.lastSignal?['sdp'];
+    if (sdp is! String) return;
     final description = RTCSessionDescription(sdp, 'offer');
     await pc.setRemoteDescription(description);
+    _remoteSet = true;
+    await _applyPendingCandidates();
     final answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
     await widget.controller.sendCallSignal(
@@ -154,6 +166,50 @@ class _CallScreenState extends State<CallScreen> {
       payload: jsonEncode(<String, dynamic>{'type': 'answer', 'sdp': answer.sdp}),
     );
     widget.controller.setCallPhase(CallPhase.ongoing);
+    await _applyPendingCandidates();
+  }
+
+  void _onControllerChanged() {
+    unawaited(_syncSignals());
+  }
+
+  Future<void> _syncSignals() async {
+    if (!widget.isIncoming) {
+      // Outgoing calls must apply the answer; otherwise no media can flow.
+      final pc = _pc;
+      final sig = _call?.lastSignal;
+      if (pc != null && sig != null && sig['type'] == 'answer') {
+        final sdp = sig['sdp'];
+        if (sdp is String && sdp.isNotEmpty && _appliedAnswerSdp != sdp) {
+          _appliedAnswerSdp = sdp;
+          await pc.setRemoteDescription(RTCSessionDescription(sdp, 'answer'));
+          _remoteSet = true;
+          widget.controller.setCallPhase(CallPhase.ongoing);
+        }
+      }
+    }
+    await _applyPendingCandidates();
+  }
+
+  Future<void> _applyPendingCandidates() async {
+    final pc = _pc;
+    if (pc == null || !_remoteSet) return;
+    final candidates = _call?.candidates ?? const <Map<String, dynamic>>[];
+    while (_appliedCandidates < candidates.length) {
+      final c = candidates[_appliedCandidates];
+      _appliedCandidates++;
+      final candidate = c['candidate'];
+      if (candidate is String && candidate.isNotEmpty) {
+        final index = c['sdpMLineIndex'];
+        await pc.addCandidate(
+          RTCIceCandidate(
+            candidate,
+            c['sdpMid'] is String ? c['sdpMid'] as String : null,
+            index is num ? index.toInt() : null,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _hangUp() async {

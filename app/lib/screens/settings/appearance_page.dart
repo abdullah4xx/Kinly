@@ -43,6 +43,8 @@ class _AppearancePageState extends State<AppearancePage> {
               ),
             ),
             const SizedBox(height: 14),
+            _ColorBanner(accent: accent, strings: strings),
+            const SizedBox(height: 14),
             Wrap(
               spacing: 12,
               runSpacing: 12,
@@ -62,9 +64,9 @@ class _AppearancePageState extends State<AppearancePage> {
               onToggle: () => setState(() => _customOpen = !_customOpen),
               onChanged: (value) {
                 setState(() => _custom = value);
-                if (!accentTooClose(value.toColor())) {
-                  settings.setAccent(value.toColor());
-                }
+                // Allow any picked color; warn instead of rejecting when it is
+                // hard to see against the dark background.
+                settings.setAccent(value.toColor());
               },
             ),
             if (accentTooClose((_custom ?? HSVColor.fromColor(accent)).toColor()))
@@ -115,6 +117,34 @@ class _AppearancePageState extends State<AppearancePage> {
           ],
         );
       },
+    );
+  }
+}
+
+class _ColorBanner extends StatelessWidget {
+  const _ColorBanner({required this.accent, required this.strings});
+
+  final Color accent;
+  final Strings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: accent,
+        borderRadius: BorderRadius.circular(Tokens.radiusMedium),
+        border: Border.all(color: withOpacity(Colors.white, 0.10)),
+      ),
+      child: Text(
+        strings.get('accentColor'),
+        style: TextStyle(
+          color: readableOn(accent),
+          fontSize: 13.5,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 }

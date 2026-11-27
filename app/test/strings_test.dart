@@ -36,9 +36,12 @@ void main() {
       }
     });
 
-    test('accentTooClose rejects colours that vanish into the background', () {
+    test('accentTooClose warns about colours that vanish into the background', () {
       expect(accentTooClose(Tokens.background), isTrue);
-      for (final preset in Tokens.accentPresets) {
+      expect(accentTooClose(Color(0xFF000000)), isTrue);
+      for (final preset in Tokens.accentPresets.where(
+        (p) => p.color.toARGB32() != Color(0xFF000000).toARGB32(),
+      )) {
         expect(accentTooClose(preset.color), isFalse, reason: preset.name);
       }
     });
