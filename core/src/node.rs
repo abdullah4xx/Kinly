@@ -522,7 +522,7 @@ pub async fn start(config: Config) -> Result<NodeHandle> {
         }
         None => storage.get_setting("avatar")?,
     };
-    let profile = Arc::new(Profile::new(name.clone(), avatar));
+    let profile = Arc::new(Profile::new(name.clone(), avatar.clone()));
 
     // The device always knows about itself, so a "self chat" can exist from
     // the first launch instead of appearing only after the first profile
@@ -909,8 +909,8 @@ async fn set_profile(
     // self chat follows the new profile without a full restart.
     let self_person = Person {
         device_id: state.device_id.clone(),
-        name: state.profile.name().read().await.clone(),
-        avatar: state.profile.avatar().read().await.clone(),
+        name: state.profile.name(),
+        avatar: state.profile.avatar(),
         hidden: false,
         hidden_by_peer: false,
         identity_created_at: state.identity.created_at(),
