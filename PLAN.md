@@ -40,13 +40,13 @@ ui-reference.png    <- reference UI design image (see section 4). Must sit in th
 | Decision | Default |
 |---|---|
 | UI technology | **Flutter** for the UI + a **Rust core** for networking and crypto (alternative: Kotlin + Jetpack Compose, Android only) |
-| Visibility toggle location | **A small eye icon in every row** of the chat list (also repeated in the chat header) |
+| Visibility toggle location | **People page** in 1.1.3 (was: eye icon per chat-list row, also in the chat header) |
 | Arch calls | **No calls** in the first version |
 | Messages to an offline peer | **Queued and delivered when the peer returns** |
 | Groups | **Not in the first version** (one-to-one chat only) |
 | Language | **Arabic + English with full RTL support** |
 | Repository visibility | **Private** on the owner's GitHub |
-| Camera tab in the bottom bar | **Deferred** (hidden or disabled in v1) |
+| Camera tab in the bottom bar | **In 1.1.3** as the fourth dock icon (was: deferred) |
 
 ---
 
@@ -90,7 +90,7 @@ ui-reference.png    <- reference UI design image (see section 4). Must sit in th
   - **Visibility toggle** (eye icon): small neumorphic control. When off, it must look clearly different (crossed-out eye, muted color).
   - Very thin dividers between rows.
   - Online/offline: a small dot on the avatar.
-- **Bottom bar:** a floating pill with round raised icon buttons: **Chats** (active, accent color), **Camera** (deferred), **Scan** (QR for verifying the security fingerprint), **Settings**.
+- **Bottom bar:** a floating pill with round raised icon buttons: **Chats** (active, accent color), **Account** (security, profile, app lock), **Settings** (habits, appearance, people, notifications, updates, about, danger), **Camera** (take a photo and send it, scan a Kinly QR code, OCR text). The pill animates the active icon with a scale + fade that respects the reduce-motion setting.
 
 ### 4.3 Chat screen (right side of the image)
 - **Header:** round back button (accent arrow), avatar, name, and below it **"Typing..."** while the peer types (otherwise "online" / "last seen"), and a round call button (accent phone icon). The visibility toggle is also available here.
@@ -180,6 +180,15 @@ ui-reference.png
 - Signaling (SDP/ICE) goes through the encrypted channel.
 - Phase one is voice, then video.
 
+### 5.7.1 Calls in 1.1.3
+
+- Basic voice and video calls ship in **1.1.3** (video on Android only).
+- Call legs: outgoing offer / incoming answer / hangup, ICE candidates, ring
+  timeout (~30s), busy/offline handling, mute and camera toggles, speaker
+  routing and local/remote preview.
+- The **app lock** gates the call screen the same way it gates the app.
+- Background and locked-screen calls are deferred to **1.1.4**.
+
 ### 5.8 Bluetooth (fallback)
 - Bluetooth Classic RFCOMM carrying the same message protocol.
 - Supported: messages and small files. Enforce a file-size limit with a clear warning.
@@ -212,8 +221,10 @@ ui-reference.png
 ## 8. Platform notes
 
 ### Android
-- A **foreground service** receives messages while the app is in the background, with a persistent notification.
-- Permissions (requested when needed): local network / nearby devices, Bluetooth, notifications, camera, microphone.
+- A **foreground service** receives messages while the app is in the background, with a persistent quiet notification (minimum importance, no sound, no vibration, no badge, no timestamp).
+- A persisted **"Receive messages in background"** setting (default on) turns the service on or off; when off, messages arrive only while the app is open.
+- A persisted **app lock** (biometric with the device-credential/PIN fallback) gates the app on launch and resume.
+- Permissions (requested when needed): local network / nearby devices, Bluetooth, notifications, camera, microphone; `minSdk 28` so Android 9 through 16+ are supported.
 - A `MulticastLock` so mDNS works.
 - Guide the user to exempt the app from battery optimization.
 
@@ -255,8 +266,14 @@ All building happens on GitHub's servers. The agent pushes code to the owner's r
 
 ### 9.4 Signing and versions
 - **The signing key is generated once** and backed up by the owner outside GitHub. **If it is lost, the app cannot be updated on devices that already have it installed (it must be uninstalled and reinstalled).**
-- `versionName` comes from the tag; `versionCode` comes from the workflow run number (always increasing).
+- `versionName` comes from the tag; `versionCode` comes from the build number in `app/pubspec.yaml` (for example `1.1.3+4` -> version name `1.1.3`, build number `4`).
 - The resulting APK is installed manually on family devices (allow installs from unknown sources).
+
+### 9.7 1.1.3 release state
+- Release name: **1.1.3** (build `1.1.3+4`).
+- CI signs every build with the stable release keystore from GitHub Secrets (`apk.yml` and `release.yml` both decode it and fail fast when missing; the keystore is kept outside the repository).
+- The rolling test pre-release is `apk-1.1.3` (arm64, signed with the stable key); the final release is `v1.1.3`.
+- Basic voice/video calls ship in 1.1.3; background and locked-screen calls are deferred to 1.1.4.
 
 ### 9.5 Repository and workflow
 - A **private** repository under the owner's account (name to be set). On private repos the free Actions minutes are limited by the account plan, so watch consumption (cache Rust and Flutter dependencies).

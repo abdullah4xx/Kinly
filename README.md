@@ -11,7 +11,7 @@ end-to-end encrypted.
 
 ## Platforms
 
-- Android (plain APK, primary)
+- Android (plain APK, primary; Android 9 / API 28 through Android 16 and newer)
 - Arch Linux (secondary)
 
 ## Repository layout
@@ -110,9 +110,14 @@ and signs the Android APK and the Linux archive, then publishes both on the
 repository's Releases page.
 
 Test APKs are published as pre-releases. The current Android build is
-[1.0.2 (arm64)](https://github.com/abdullah4xx/Kinly/releases/download/apk-1.0.2/kinly-1.0.2-arm64.apk).
+[1.1.3 (arm64)](https://github.com/abdullah4xx/Kinly/releases/download/apk-1.1.3/kinly-1.1.3-arm64.apk).
 Installed builds check the GitHub Releases API from Settings and offer the
 newest APK when one exists.
+
+The 1.1.3 release adds basic voice/video calls (video on Android), the camera
+tab with photo send / QR scan / OCR, chat wallpapers, the People page with the
+visibility switch, the quiet background notification, the biometric app lock,
+the in-app APK updater and local self-chats.
 
 ## License
 
